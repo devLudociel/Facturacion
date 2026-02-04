@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturación - Reformas y Construcción</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; font-size: 1.8rem; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { padding: 12px 24px; border: none; background: #fff; cursor: pointer; border-radius: 8px; font-size: 1rem; transition: all 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .tab-btn:hover { background: #e0e0e0; }
+        .tab-btn.active { background: #2196F3; color: white; }
+        .tab-content { display: none; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        input, textarea, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s; }
+        textarea { resize: vertical; min-height: 60px; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #2196F3; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.3s; }
+        .btn-primary { background: #2196F3; color: white; }
+        .btn-primary:hover { background: #1976D2; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-success:hover { background: #388E3C; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-danger:hover { background: #d32f2f; }
+        .btn-secondary { background: #757575; color: white; }
+        .btn-secondary:hover { background: #616161; }
+        .conceptos-list { margin-top: 20px; }
+        .concepto-item { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2196F3; }
+        .concepto-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .concepto-header h4 { color: #333; }
+        .concepto-campos { display: grid; gap: 15px; }
+        .concepto-fila { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end; }
+        .concepto-fila input { padding: 10px; }
+        .concepto-total { font-weight: bold; text-align: right; font-size: 1.1rem; color: #2196F3; padding: 10px; background: #e3f2fd; border-radius: 8px; }
+        .clientes-list { display: grid; gap: 10px; margin-top: 20px; }
+        .cliente-card { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.3s; }
+        .cliente-card:hover { background: #e3f2fd; }
+        .cliente-info h4 { margin-bottom: 5px; }
+        .cliente-info p { color: #666; font-size: 0.9rem; }
+        .cliente-actions { display: flex; gap: 10px; }
+        .totales { margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px; }
+        .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0; }
+        .total-row:last-child { border-bottom: none; font-size: 1.2rem; font-weight: bold; }
+        .historial-list { display: grid; gap: 10px; }
+        .historial-item { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .historial-info h4 { margin-bottom: 5px; }
+        .historial-info p { color: #666; font-size: 0.9rem; }
+        .logo-preview { max-width: 150px; max-height: 100px; margin-top: 10px; display: block; }
+        @media (max-width: 768px) { .concepto-fila { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 500px) { .concepto-fila { grid-template-columns: 1fr; } }
+        .actions-bar { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .numero-factura { font-size: 1.2rem; color: #2196F3; font-weight: bold; }
+        .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .alert-info { background: #e3f2fd; color: #1565c0; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; }
+        .conceptos-rapidos { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .concepto-rapido { padding: 8px 16px; background: #e3f2fd; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s; }
+        .concepto-rapido:hover { background: #bbdefb; }
+        .section-title { font-size: 1.2rem; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
+        .small-label { font-size: 0.85rem; color: #666; margin-bottom: 5px; display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ Facturación - Reformas y Construcción</h1>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('nueva')">📝 Nueva Factura</button>
+            <button class="tab-btn" onclick="showTab('clientes')">👥 Clientes</button>
+            <button class="tab-btn" onclick="showTab('historial')">📋 Historial</button>
+            <button class="tab-btn" onclick="showTab('config')">⚙️ Configuración</button>
+        </div>
+
+        <div id="tab-nueva" class="tab-content active">
+            <div class="alert alert-info">
+                <strong>Próxima factura:</strong> <span id="proxima-factura" class="numero-factura">F26-001</span>
+            </div>
+            <h3 class="section-title">Datos del Cliente</h3>
+            <div id="cliente-seleccionado" style="display: none; margin-bottom: 20px;">
+                <div class="alert alert-success">
+                    Cliente seleccionado: <strong id="nombre-cliente-seleccionado"></strong>
+                    <button class="btn btn-secondary" onclick="limpiarCliente()" style="margin-left: 15px; padding: 5px 15px;">Cambiar</button>
+                </div>
+            </div>
+            <div id="form-cliente">
+                <div class="form-row">
+                    <div class="form-group"><label>Nombre completo *</label><input type="text" id="cliente-nombre" placeholder="Nombre del cliente"></div>
+                    <div class="form-group"><label>NIF/CIF *</label><input type="text" id="cliente-nif" placeholder="12345678A"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Dirección *</label><input type="text" id="cliente-direccion" placeholder="Calle, número, piso..."></div>
+                    <div class="form-group"><label>CP y Localidad *</label><input type="text" id="cliente-localidad" placeholder="38760, Los Llanos de Aridane"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Provincia</label><input type="text" id="cliente-provincia" placeholder="Santa Cruz de Tenerife"></div>
+                    <div class="form-group"><label>Teléfono</label><input type="text" id="cliente-telefono" placeholder="600000000"></div>
+                </div>
+                <button class="btn btn-secondary" onclick="guardarClienteDesdeFactura()">💾 Guardar cliente</button>
+            </div>
+            <h3 class="section-title" style="margin-top: 30px;">Conceptos</h3>
+            <p style="margin-bottom: 10px; color: #666;">Conceptos rápidos:</p>
+            <div class="conceptos-rapidos">
+                <button class="concepto-rapido" onclick="addConceptoRapido('Mano de obra', 'Horas de trabajo', 15)">🔨 Mano de obra</button>
+                <button class="concepto-rapido" onclick="addConceptoRapido('Albañilería', 'Trabajos de albañilería', 18)">🧱 Albañilería</button>
+                <button class="concepto-rapido" onclick="addConceptoRapido('Pintura', 'Trabajos de pintura', 14)">🎨 Pintura</button>
+                <button class="concepto-rapido" onclick="addConceptoRapido('Fontanería', 'Trabajos de fontanería', 20)">🔧 Fontanería</button>
+                <button class="concepto-rapido" onclick="addConceptoRapido('Electricidad', 'Trabajos de electricidad', 22)">⚡ Electricidad</button>
+                <button class="concepto-rapido" onclick="addConceptoRapido('Materiales', 'Materiales utilizados', 0)">📦 Materiales</button>
+            </div>
+            <div id="conceptos-list" class="conceptos-list"></div>
+            <button class="btn btn-primary" onclick="addConcepto()" style="margin-top: 15px;">+ Añadir concepto</button>
+            <div class="totales">
+                <div class="total-row"><span>Base Imponible</span><span id="base-imponible">0,00€</span></div>
+                <div class="total-row" id="row-iva" style="display: none;"><span>IVA (<span id="iva-porcentaje">21</span>%)</span><span id="iva-total">0,00€</span></div>
+                <div class="total-row"><span>TOTAL</span><span id="total-factura">0,00€</span></div>
+            </div>
+            <h3 class="section-title" style="margin-top: 30px;">Fechas</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Fecha de emisión</label><input type="date" id="fecha-emision"></div>
+                <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="fecha-vencimiento"></div>
+            </div>
+            <div class="actions-bar">
+                <button class="btn btn-success" onclick="previsualizarFactura()">👁️ Previsualizar</button>
+                <button class="btn btn-primary" onclick="generarPDF()">📄 Generar PDF</button>
+                <button class="btn btn-danger" onclick="limpiarFactura()">🗑️ Limpiar</button>
+            </div>
+        </div>
+
+        <div id="tab-clientes" class="tab-content">
+            <h3 class="section-title">Clientes Guardados</h3>
+            <div id="clientes-list" class="clientes-list"><p style="color: #666;">No hay clientes guardados.</p></div>
+        </div>
+
+        <div id="tab-historial" class="tab-content">
+            <h3 class="section-title">Historial de Facturas</h3>
+            <div id="historial-list" class="historial-list"><p style="color: #666;">No hay facturas en el historial.</p></div>
+        </div>
+
+        <div id="tab-config" class="tab-content">
+            <h3 class="section-title">Datos del Emisor</h3>
+            <div class="form-group">
+                <label>Logo de la empresa</label>
+                <input type="file" id="logo-input" accept="image/*" onchange="cargarLogo(event)">
+                <img id="logo-preview" class="logo-preview" style="display: none;">
+                <button class="btn btn-danger" onclick="eliminarLogo()" style="margin-top: 10px; display: none;" id="btn-eliminar-logo">Eliminar logo</button>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Nombre completo *</label><input type="text" id="emisor-nombre" placeholder="Tu nombre"></div>
+                <div class="form-group"><label>NIF *</label><input type="text" id="emisor-nif" placeholder="12345678A"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Dirección *</label><input type="text" id="emisor-direccion" placeholder="Calle, número..."></div>
+                <div class="form-group"><label>CP y Localidad *</label><input type="text" id="emisor-localidad" placeholder="38760, Los Llanos"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Provincia</label><input type="text" id="emisor-provincia" placeholder="Santa Cruz de Tenerife"></div>
+                <div class="form-group"><label>País</label><input type="text" id="emisor-pais" value="España"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Teléfono</label><input type="text" id="emisor-telefono" placeholder="+34 600 000 000"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="emisor-email" placeholder="tu@email.com"></div>
+            </div>
+            <div class="form-group"><label>IBAN</label><input type="text" id="emisor-iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
+            <h3 class="section-title" style="margin-top: 30px;">Configuración de Facturas</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Aplicar IVA</label>
+                    <select id="config-iva" onchange="toggleIVA()">
+                        <option value="0">Sin IVA</option>
+                        <option value="21">21% (General)</option>
+                        <option value="10">10% (Reducido)</option>
+                        <option value="4">4% (Superreducido)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Último nº factura</label><input type="number" id="config-ultimo-numero" value="0" min="0" onchange="actualizarNumeroFactura()"></div>
+            </div>
+            <button class="btn btn-success" onclick="guardarConfiguracion()" style="margin-top: 20px;">💾 Guardar configuración</button>
+        </div>
+    </div>
+
+    <div id="modal-preview" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; overflow-y: auto; padding: 20px;">
+        <div style="max-width: 210mm; margin: 0 auto;">
+            <button onclick="cerrarPreview()" style="position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 8px; cursor: pointer; z-index: 1001;">✕ Cerrar</button>
+            <div id="factura-contenido"></div>
+        </div>
+    </div>
+
+    <script>
+        let conceptos = [];
+        let clienteSeleccionado = null;
+        let config = { emisor: {}, iva: 0, ultimoNumero: 0, logo: null };
+        let clientes = [];
+        let historial = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarDatos();
+            actualizarNumeroFactura();
+            setFechasDefecto();
+            renderClientes();
+            renderHistorial();
+            addConcepto();
+        });
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function setFechasDefecto() {
+            const hoy = new Date();
+            const venc = new Date();
+            venc.setDate(venc.getDate() + 7);
+            document.getElementById('fecha-emision').value = hoy.toISOString().split('T')[0];
+            document.getElementById('fecha-vencimiento').value = venc.toISOString().split('T')[0];
+        }
+
+        function formatDateDisplay(dateStr) {
+            return new Date(dateStr).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        function getNumeroFactura() {
+            const año = new Date().getFullYear().toString().slice(-2);
+            const numero = (config.ultimoNumero + 1).toString().padStart(3, '0');
+            return `F${año}-${numero}`;
+        }
+
+        function actualizarNumeroFactura() {
+            const input = document.getElementById('config-ultimo-numero');
+            if (input) config.ultimoNumero = parseInt(input.value) || 0;
+            document.getElementById('proxima-factura').textContent = getNumeroFactura();
+        }
+
+        function addConcepto(concepto = '', descripcion = '', precio = 0, unidades = 1) {
+            conceptos.push({ id: Date.now(), concepto, descripcion, precio, unidades });
+            renderConceptos();
+        }
+
+        function addConceptoRapido(concepto, descripcion, precio) { 
+            addConcepto(concepto, descripcion, precio, 1); 
+        }
+
+        function removeConcepto(id) {
+            conceptos = conceptos.filter(c => c.id !== id);
+            renderConceptos();
+        }
+
+        function updateConcepto(id, field, value) {
+            const c = conceptos.find(c => c.id === id);
+            if (c) c[field] = (field === 'precio' || field === 'unidades') ? (parseFloat(value) || 0) : value;
+            calcularTotales();
+        }
+
+        function renderConceptos() {
+            document.getElementById('conceptos-list').innerHTML = conceptos.map((c, index) => `
+                <div class="concepto-item">
+                    <div class="concepto-header">
+                        <h4>Concepto ${index + 1}</h4>
+                        <button class="btn btn-danger" onclick="removeConcepto(${c.id})" style="padding: 6px 12px;">✕ Eliminar</button>
+                    </div>
+                    <div class="concepto-campos">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <span class="small-label">Concepto (título corto)</span>
+                            <input type="text" placeholder="Ej: Encalado, Enlucido, Lijado" value="${c.concepto}" onchange="updateConcepto(${c.id}, 'concepto', this.value)">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <span class="small-label">Descripción del trabajo</span>
+                            <textarea placeholder="Ej: Horas trabajadas en encalado de paredes con mortero, enlucido de paredes y lijado de marcos de madera para puertas" onchange="updateConcepto(${c.id}, 'descripcion', this.value)">${c.descripcion}</textarea>
+                        </div>
+                        <div class="concepto-fila">
+                            <div>
+                                <span class="small-label">Precio unitario (€)</span>
+                                <input type="number" placeholder="0.00" value="${c.precio}" step="0.01" min="0" onchange="updateConcepto(${c.id}, 'precio', this.value)">
+                            </div>
+                            <div>
+                                <span class="small-label">Unidades</span>
+                                <input type="number" placeholder="1" value="${c.unidades}" min="1" onchange="updateConcepto(${c.id}, 'unidades', this.value)">
+                            </div>
+                            <div>
+                                <span class="small-label">Subtotal</span>
+                                <div class="concepto-total">${formatMoney(c.precio * c.unidades)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            calcularTotales();
+        }
+
+        function calcularTotales() {
+            const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
+            const ivaRate = parseInt(config.iva) || 0;
+            const iva = base * (ivaRate / 100);
+            document.getElementById('base-imponible').textContent = formatMoney(base);
+            document.getElementById('total-factura').textContent = formatMoney(base + iva);
+            const rowIva = document.getElementById('row-iva');
+            if (ivaRate > 0) {
+                rowIva.style.display = 'flex';
+                document.getElementById('iva-porcentaje').textContent = ivaRate;
+                document.getElementById('iva-total').textContent = formatMoney(iva);
+            } else rowIva.style.display = 'none';
+        }
+
+        function formatMoney(n) { return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '€'; }
+
+        function guardarClienteDesdeFactura() {
+            const c = { id: Date.now(), nombre: document.getElementById('cliente-nombre').value, nif: document.getElementById('cliente-nif').value, direccion: document.getElementById('cliente-direccion').value, localidad: document.getElementById('cliente-localidad').value, provincia: document.getElementById('cliente-provincia').value, telefono: document.getElementById('cliente-telefono').value };
+            if (!c.nombre || !c.nif) { alert('Rellena nombre y NIF'); return; }
+            clientes.push(c);
+            guardarDatos();
+            renderClientes();
+            alert('Cliente guardado');
+        }
+
+        function seleccionarCliente(id) {
+            const c = clientes.find(x => x.id === id);
+            if (c) {
+                document.getElementById('cliente-nombre').value = c.nombre;
+                document.getElementById('cliente-nif').value = c.nif;
+                document.getElementById('cliente-direccion').value = c.direccion;
+                document.getElementById('cliente-localidad').value = c.localidad;
+                document.getElementById('cliente-provincia').value = c.provincia || '';
+                document.getElementById('cliente-telefono').value = c.telefono || '';
+                document.getElementById('form-cliente').style.display = 'none';
+                document.getElementById('cliente-seleccionado').style.display = 'block';
+                document.getElementById('nombre-cliente-seleccionado').textContent = c.nombre;
+            }
+            showTab('nueva');
+        }
+
+        function limpiarCliente() {
+            ['nombre', 'nif', 'direccion', 'localidad', 'provincia', 'telefono'].forEach(f => document.getElementById('cliente-' + f).value = '');
+            document.getElementById('form-cliente').style.display = 'block';
+            document.getElementById('cliente-seleccionado').style.display = 'none';
+        }
+
+        function eliminarCliente(id) {
+            if (confirm('¿Eliminar cliente?')) { clientes = clientes.filter(c => c.id !== id); guardarDatos(); renderClientes(); }
+        }
+
+        function renderClientes() {
+            const cont = document.getElementById('clientes-list');
+            if (clientes.length === 0) { cont.innerHTML = '<p style="color: #666;">No hay clientes guardados.</p>'; return; }
+            cont.innerHTML = clientes.map(c => `
+                <div class="cliente-card" onclick="seleccionarCliente(${c.id})">
+                    <div class="cliente-info"><h4>${c.nombre}</h4><p>${c.nif} | ${c.localidad}</p></div>
+                    <div class="cliente-actions">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); seleccionarCliente(${c.id})">Usar</button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); eliminarCliente(${c.id})">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function cargarLogo(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    config.logo = e.target.result;
+                    document.getElementById('logo-preview').src = config.logo;
+                    document.getElementById('logo-preview').style.display = 'block';
+                    document.getElementById('btn-eliminar-logo').style.display = 'inline-block';
+                    guardarDatos();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function eliminarLogo() {
+            config.logo = null;
+            document.getElementById('logo-preview').style.display = 'none';
+            document.getElementById('btn-eliminar-logo').style.display = 'none';
+            document.getElementById('logo-input').value = '';
+            guardarDatos();
+        }
+
+        function toggleIVA() { config.iva = document.getElementById('config-iva').value; calcularTotales(); }
+
+        function guardarConfiguracion() {
+            config.emisor = { nombre: document.getElementById('emisor-nombre').value, nif: document.getElementById('emisor-nif').value, direccion: document.getElementById('emisor-direccion').value, localidad: document.getElementById('emisor-localidad').value, provincia: document.getElementById('emisor-provincia').value, pais: document.getElementById('emisor-pais').value, telefono: document.getElementById('emisor-telefono').value, email: document.getElementById('emisor-email').value, iban: document.getElementById('emisor-iban').value };
+            config.iva = document.getElementById('config-iva').value;
+            config.ultimoNumero = parseInt(document.getElementById('config-ultimo-numero').value) || 0;
+            guardarDatos();
+            actualizarNumeroFactura();
+            alert('Configuración guardada');
+        }
+
+        function guardarDatos() {
+            localStorage.setItem('facturacion-config', JSON.stringify(config));
+            localStorage.setItem('facturacion-clientes', JSON.stringify(clientes));
+            localStorage.setItem('facturacion-historial', JSON.stringify(historial));
+        }
+
+        function cargarDatos() {
+            const sc = localStorage.getItem('facturacion-config');
+            const scl = localStorage.getItem('facturacion-clientes');
+            const sh = localStorage.getItem('facturacion-historial');
+            if (sc) {
+                config = JSON.parse(sc);
+                if (config.emisor) {
+                    document.getElementById('emisor-nombre').value = config.emisor.nombre || '';
+                    document.getElementById('emisor-nif').value = config.emisor.nif || '';
+                    document.getElementById('emisor-direccion').value = config.emisor.direccion || '';
+                    document.getElementById('emisor-localidad').value = config.emisor.localidad || '';
+                    document.getElementById('emisor-provincia').value = config.emisor.provincia || '';
+                    document.getElementById('emisor-pais').value = config.emisor.pais || 'España';
+                    document.getElementById('emisor-telefono').value = config.emisor.telefono || '';
+                    document.getElementById('emisor-email').value = config.emisor.email || '';
+                    document.getElementById('emisor-iban').value = config.emisor.iban || '';
+                }
+                document.getElementById('config-iva').value = config.iva || 0;
+                document.getElementById('config-ultimo-numero').value = config.ultimoNumero || 0;
+                if (config.logo) {
+                    document.getElementById('logo-preview').src = config.logo;
+                    document.getElementById('logo-preview').style.display = 'block';
+                    document.getElementById('btn-eliminar-logo').style.display = 'inline-block';
+                }
+            }
+            if (scl) clientes = JSON.parse(scl);
+            if (sh) historial = JSON.parse(sh);
+        }
+
+        function getClienteData() {
+            return { nombre: document.getElementById('cliente-nombre').value, nif: document.getElementById('cliente-nif').value, direccion: document.getElementById('cliente-direccion').value, localidad: document.getElementById('cliente-localidad').value, provincia: document.getElementById('cliente-provincia').value, telefono: document.getElementById('cliente-telefono').value };
+        }
+
+        function generarHTMLFactura() {
+            const cl = getClienteData();
+            const fe = document.getElementById('fecha-emision').value;
+            const fv = document.getElementById('fecha-vencimiento').value;
+            const nf = getNumeroFactura();
+            const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
+            const ivaRate = parseInt(config.iva) || 0;
+            const iva = base * (ivaRate / 100);
+            const total = base + iva;
+            const logo = config.logo ? `<img src="${config.logo}" style="max-width:120px;max-height:80px;">` : '';
+            
+            return `<div style="background:white;padding:40px;font-family:'Segoe UI',Tahoma,sans-serif;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #FFD700;">
+                    ${logo}
+                    <div style="text-align:right;">
+                        <h2 style="font-size:2rem;color:#333;margin:0;">FACTURA</h2>
+                        <div style="color:#2196F3;font-weight:bold;margin-top:5px;">${nf}</div>
+                        <div style="color:#666;margin-top:5px;">${formatDateDisplay(fe)}</div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px;padding:20px;background:#f9f9f9;border-radius:8px;">
+                    <div>
+                        <h4 style="color:#333;margin:0 0 10px 0;font-size:0.9rem;text-transform:uppercase;">Cliente</h4>
+                        <p style="margin:5px 0;color:#555;"><strong>${cl.nombre}</strong></p>
+                        <p style="margin:5px 0;color:#555;">${cl.nif}</p>
+                        <p style="margin:5px 0;color:#555;">${cl.direccion}</p>
+                        <p style="margin:5px 0;color:#555;">${cl.localidad}${cl.provincia ? ', ' + cl.provincia : ''}</p>
+                        ${cl.telefono ? `<p style="margin:5px 0;color:#555;">Tel: ${cl.telefono}</p>` : ''}
+                        <p style="margin-top:10px;color:#555;"><strong>Vencimiento:</strong> ${formatDateDisplay(fv)}</p>
+                    </div>
+                    <div>
+                        <h4 style="color:#333;margin:0 0 10px 0;font-size:0.9rem;text-transform:uppercase;">Emisor</h4>
+                        <p style="margin:5px 0;color:#555;"><strong>${config.emisor.nombre || 'Sin configurar'}</strong></p>
+                        <p style="margin:5px 0;color:#555;">${config.emisor.nif || ''}</p>
+                        <p style="margin:5px 0;color:#555;">${config.emisor.direccion || ''}</p>
+                        <p style="margin:5px 0;color:#555;">${config.emisor.localidad || ''}${config.emisor.provincia ? ', ' + config.emisor.provincia : ''}</p>
+                        ${config.emisor.telefono ? `<p style="margin:5px 0;color:#555;">Tel: ${config.emisor.telefono}</p>` : ''}
+                        ${config.emisor.email ? `<p style="margin:5px 0;color:#555;">${config.emisor.email}</p>` : ''}
+                    </div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
+                    <thead><tr>
+                        <th style="background:#FFD700;padding:12px;text-align:left;font-weight:600;">CONCEPTO</th>
+                        <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">PRECIO</th>
+                        <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">UDS</th>
+                        <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">SUBTOTAL</th>
+                        <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">TOTAL</th>
+                    </tr></thead>
+                    <tbody>${conceptos.filter(c => c.concepto).map(c => `<tr>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;"><strong>${c.concepto}</strong>${c.descripcion ? `<br><span style="font-size:0.9rem;color:#666;">${c.descripcion}</span>` : ''}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(c.precio)}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${c.unidades}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(c.precio * c.unidades)}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(c.precio * c.unidades)}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+                <div style="margin-left:auto;width:250px;">
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>Base Imponible</span><span>${formatMoney(base)}</span></div>
+                    ${ivaRate > 0 ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>IVA (${ivaRate}%)</span><span>${formatMoney(iva)}</span></div>` : ''}
+                    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;background:#FFD700;padding:12px;margin-top:10px;"><span>TOTAL</span><span>${formatMoney(total)}</span></div>
+                </div>
+                ${config.emisor.iban ? `<div style="margin-top:30px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
+                <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;text-align:center;font-size:0.85rem;color:#666;">
+                    ${config.emisor.nombre || ''} | ${config.emisor.direccion || ''} ${config.emisor.localidad || ''} | ${config.emisor.nif || ''} | ${config.emisor.telefono || ''} | ${config.emisor.email || ''}
+                </div>
+            </div>`;
+        }
+
+        function previsualizarFactura() {
+            const cl = getClienteData();
+            if (!cl.nombre) { alert('Introduce el nombre del cliente'); return; }
+            if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
+            document.getElementById('factura-contenido').innerHTML = generarHTMLFactura();
+            document.getElementById('modal-preview').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function cerrarPreview() {
+            document.getElementById('modal-preview').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function generarPDF() {
+            const cl = getClienteData();
+            if (!cl.nombre) { alert('Introduce el nombre del cliente'); return; }
+            if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = generarHTMLFactura();
+            document.body.appendChild(tempDiv);
+            const nf = getNumeroFactura();
+            html2pdf().set({
+                margin: 10,
+                filename: `${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(tempDiv.firstChild).save().then(() => {
+                document.body.removeChild(tempDiv);
+                const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
+                const ivaRate = parseInt(config.iva) || 0;
+                historial.unshift({ numero: nf, cliente: cl.nombre, fecha: document.getElementById('fecha-emision').value, total: base + (base * ivaRate / 100) });
+                config.ultimoNumero++;
+                document.getElementById('config-ultimo-numero').value = config.ultimoNumero;
+                guardarDatos();
+                actualizarNumeroFactura();
+                renderHistorial();
+                alert('PDF generado correctamente');
+            });
+        }
+
+        function limpiarFactura() {
+            if (confirm('¿Limpiar factura actual?')) { limpiarCliente(); conceptos = []; addConcepto(); setFechasDefecto(); }
+        }
+
+        function renderHistorial() {
+            const cont = document.getElementById('historial-list');
+            if (historial.length === 0) { cont.innerHTML = '<p style="color: #666;">No hay facturas en el historial.</p>'; return; }
+            cont.innerHTML = historial.map(h => `
+                <div class="historial-item">
+                    <div class="historial-info"><h4>${h.numero}</h4><p>${h.cliente} | ${formatDateDisplay(h.fecha)}</p></div>
+                    <div style="font-weight:bold;color:#2196F3;">${formatMoney(h.total)}</div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

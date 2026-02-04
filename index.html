@@ -31,6 +31,9 @@
         .btn-danger:hover { background: #d32f2f; }
         .btn-secondary { background: #757575; color: white; }
         .btn-secondary:hover { background: #616161; }
+        .btn-warning { background: #FF9800; color: white; }
+        .btn-warning:hover { background: #F57C00; }
+        .btn-small { padding: 8px 12px; font-size: 0.85rem; }
         .conceptos-list { margin-top: 20px; }
         .concepto-item { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2196F3; }
         .concepto-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -49,22 +52,26 @@
         .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0; }
         .total-row:last-child { border-bottom: none; font-size: 1.2rem; font-weight: bold; }
         .historial-list { display: grid; gap: 10px; }
-        .historial-item { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .historial-item { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .historial-info h4 { margin-bottom: 5px; }
         .historial-info p { color: #666; font-size: 0.9rem; }
+        .historial-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .historial-total { font-weight: bold; color: #2196F3; font-size: 1.1rem; min-width: 100px; text-align: right; }
         .logo-preview { max-width: 150px; max-height: 100px; margin-top: 10px; display: block; }
-        @media (max-width: 768px) { .concepto-fila { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .concepto-fila { grid-template-columns: 1fr 1fr; } .historial-item { flex-direction: column; align-items: flex-start; } }
         @media (max-width: 500px) { .concepto-fila { grid-template-columns: 1fr; } }
         .actions-bar { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
         .numero-factura { font-size: 1.2rem; color: #2196F3; font-weight: bold; }
         .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         .alert-info { background: #e3f2fd; color: #1565c0; }
         .alert-success { background: #e8f5e9; color: #2e7d32; }
+        .alert-warning { background: #fff3e0; color: #e65100; }
         .conceptos-rapidos { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
         .concepto-rapido { padding: 8px 16px; background: #e3f2fd; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s; }
         .concepto-rapido:hover { background: #bbdefb; }
         .section-title { font-size: 1.2rem; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
         .small-label { font-size: 0.85rem; color: #666; margin-bottom: 5px; display: block; }
+        .editing-badge { background: #FF9800; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -78,9 +85,14 @@
         </div>
 
         <div id="tab-nueva" class="tab-content active">
-            <div class="alert alert-info">
+            <div class="alert alert-info" id="alert-nueva-factura">
                 <strong>Próxima factura:</strong> <span id="proxima-factura" class="numero-factura">F26-001</span>
             </div>
+            <div class="alert alert-warning" id="alert-editando" style="display: none;">
+                <strong>✏️ Editando factura:</strong> <span id="editando-numero"></span>
+                <button class="btn btn-secondary btn-small" onclick="cancelarEdicion()" style="margin-left: 15px;">Cancelar edición</button>
+            </div>
+            
             <h3 class="section-title">Datos del Cliente</h3>
             <div id="cliente-seleccionado" style="display: none; margin-bottom: 20px;">
                 <div class="alert alert-success">
@@ -199,6 +211,7 @@
         let config = { emisor: {}, iva: 0, ultimoNumero: 0, logo: null };
         let clientes = [];
         let historial = [];
+        let editandoFactura = null; // Para saber si estamos editando una factura existente
 
         document.addEventListener('DOMContentLoaded', () => {
             cargarDatos();
@@ -229,6 +242,7 @@
         }
 
         function getNumeroFactura() {
+            if (editandoFactura) return editandoFactura.numero;
             const año = new Date().getFullYear().toString().slice(-2);
             const numero = (config.ultimoNumero + 1).toString().padStart(3, '0');
             return `F${año}-${numero}`;
@@ -241,7 +255,7 @@
         }
 
         function addConcepto(concepto = '', descripcion = '', precio = 0, unidades = 1) {
-            conceptos.push({ id: Date.now(), concepto, descripcion, precio, unidades });
+            conceptos.push({ id: Date.now() + Math.random(), concepto, descripcion, precio, unidades });
             renderConceptos();
         }
 
@@ -434,6 +448,79 @@
             return { nombre: document.getElementById('cliente-nombre').value, nif: document.getElementById('cliente-nif').value, direccion: document.getElementById('cliente-direccion').value, localidad: document.getElementById('cliente-localidad').value, provincia: document.getElementById('cliente-provincia').value, telefono: document.getElementById('cliente-telefono').value };
         }
 
+        // =====================
+        // FUNCIONES DE EDICIÓN
+        // =====================
+        
+        function editarFactura(index) {
+            const factura = historial[index];
+            if (!factura) return;
+            
+            editandoFactura = { ...factura, index };
+            
+            // Cargar datos del cliente
+            document.getElementById('cliente-nombre').value = factura.clienteData?.nombre || factura.cliente;
+            document.getElementById('cliente-nif').value = factura.clienteData?.nif || '';
+            document.getElementById('cliente-direccion').value = factura.clienteData?.direccion || '';
+            document.getElementById('cliente-localidad').value = factura.clienteData?.localidad || '';
+            document.getElementById('cliente-provincia').value = factura.clienteData?.provincia || '';
+            document.getElementById('cliente-telefono').value = factura.clienteData?.telefono || '';
+            
+            // Cargar conceptos
+            conceptos = factura.conceptos ? factura.conceptos.map(c => ({...c, id: Date.now() + Math.random()})) : [];
+            if (conceptos.length === 0) addConcepto();
+            renderConceptos();
+            
+            // Cargar fechas
+            document.getElementById('fecha-emision').value = factura.fecha || '';
+            document.getElementById('fecha-vencimiento').value = factura.fechaVencimiento || '';
+            
+            // Mostrar indicador de edición
+            document.getElementById('alert-nueva-factura').style.display = 'none';
+            document.getElementById('alert-editando').style.display = 'block';
+            document.getElementById('editando-numero').textContent = factura.numero;
+            
+            // Cambiar a pestaña de nueva factura
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-nueva').classList.add('active');
+            document.querySelector('.tab-btn').classList.add('active');
+        }
+        
+        function cancelarEdicion() {
+            editandoFactura = null;
+            document.getElementById('alert-nueva-factura').style.display = 'block';
+            document.getElementById('alert-editando').style.display = 'none';
+            limpiarFactura(true);
+        }
+        
+        function descargarFacturaHistorial(index) {
+            const factura = historial[index];
+            if (!factura) return;
+            
+            // Cargar temporalmente los datos para generar el PDF
+            const tempConceptos = conceptos;
+            const tempEditando = editandoFactura;
+            
+            conceptos = factura.conceptos || [];
+            editandoFactura = factura;
+            
+            // Generar PDF con los datos de la factura guardada
+            generarPDFConDatos(factura);
+            
+            // Restaurar datos anteriores
+            conceptos = tempConceptos;
+            editandoFactura = tempEditando;
+        }
+        
+        function eliminarFacturaHistorial(index) {
+            if (confirm('¿Eliminar esta factura del historial?')) {
+                historial.splice(index, 1);
+                guardarDatos();
+                renderHistorial();
+            }
+        }
+
         function generarHTMLFactura() {
             const cl = getClienteData();
             const fe = document.getElementById('fecha-emision').value;
@@ -515,33 +602,32 @@
             document.getElementById('modal-preview').style.display = 'none';
             document.body.style.overflow = 'auto';
         }
-
-        function generarPDF() {
-            const cl = getClienteData();
-            if (!cl.nombre) { alert('Introduce el nombre del cliente'); return; }
-            if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
-            
+        
+        function generarPDFConDatos(factura) {
             const doc = new jsPDF('p', 'mm', 'a4');
-            const nf = getNumeroFactura();
-            const fe = document.getElementById('fecha-emision').value;
-            const fv = document.getElementById('fecha-vencimiento').value;
-            const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
+            const cl = factura.clienteData || { nombre: factura.cliente };
+            const nf = factura.numero;
+            const fe = factura.fecha;
+            const fv = factura.fechaVencimiento || fe;
+            const conceptosFactura = factura.conceptos || [];
+            const base = conceptosFactura.reduce((s, c) => s + (c.precio * c.unidades), 0);
             const ivaRate = parseInt(config.iva) || 0;
             const iva = base * (ivaRate / 100);
             const total = base + iva;
             
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, iva, total, ivaRate);
+            doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
+        }
+        
+        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, iva, total, ivaRate) {
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
             
-            // Logo si existe
             if (config.logo) {
-                try {
-                    doc.addImage(config.logo, 'PNG', leftMargin, y, 30, 20);
-                } catch(e) {}
+                try { doc.addImage(config.logo, 'PNG', leftMargin, y, 30, 20); } catch(e) {}
             }
             
-            // Título FACTURA
             doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
             doc.text('FACTURA', rightMargin, y + 5, { align: 'right' });
@@ -554,13 +640,11 @@
             doc.setFont('helvetica', 'normal');
             doc.text(formatDateDisplay(fe), rightMargin, y + 18, { align: 'right' });
             
-            // Línea amarilla
             y += 28;
             doc.setDrawColor(255, 215, 0);
             doc.setLineWidth(1);
             doc.line(leftMargin, y, rightMargin, y);
             
-            // Datos Cliente y Emisor
             y += 10;
             doc.setFontSize(9);
             doc.setTextColor(100);
@@ -572,43 +656,32 @@
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50);
             doc.setFontSize(10);
-            doc.text(cl.nombre, leftMargin, y);
+            doc.text(cl.nombre || '', leftMargin, y);
             doc.text(config.emisor.nombre || 'Sin configurar', 115, y);
             
             y += 5;
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
-            doc.text(cl.nif, leftMargin, y);
+            doc.text(cl.nif || '', leftMargin, y);
             doc.text(config.emisor.nif || '', 115, y);
             
             y += 5;
-            doc.text(cl.direccion, leftMargin, y);
+            doc.text(cl.direccion || '', leftMargin, y);
             doc.text(config.emisor.direccion || '', 115, y);
             
             y += 5;
-            doc.text(cl.localidad + (cl.provincia ? ', ' + cl.provincia : ''), leftMargin, y);
+            doc.text((cl.localidad || '') + (cl.provincia ? ', ' + cl.provincia : ''), leftMargin, y);
             doc.text((config.emisor.localidad || '') + (config.emisor.provincia ? ', ' + config.emisor.provincia : ''), 115, y);
             
-            if (cl.telefono) {
-                y += 5;
-                doc.text('Tel: ' + cl.telefono, leftMargin, y);
-            }
-            if (config.emisor.telefono) {
-                doc.text('Tel: ' + config.emisor.telefono, 115, y);
-            }
+            if (cl.telefono) { y += 5; doc.text('Tel: ' + cl.telefono, leftMargin, y); }
+            if (config.emisor.telefono) { doc.text('Tel: ' + config.emisor.telefono, 115, y); }
             
             y += 5;
             doc.setFont('helvetica', 'bold');
             doc.text('Vencimiento: ' + formatDateDisplay(fv), leftMargin, y);
-            if (config.emisor.email) {
-                doc.setFont('helvetica', 'normal');
-                doc.text(config.emisor.email, 115, y);
-            }
+            if (config.emisor.email) { doc.setFont('helvetica', 'normal'); doc.text(config.emisor.email, 115, y); }
             
-            // Tabla de conceptos
             y += 15;
-            
-            // Cabecera tabla
             doc.setFillColor(255, 215, 0);
             doc.rect(leftMargin, y, 170, 8, 'F');
             doc.setTextColor(0);
@@ -624,7 +697,7 @@
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(50);
             
-            conceptos.filter(c => c.concepto).forEach(c => {
+            conceptosFactura.filter(c => c.concepto).forEach(c => {
                 doc.setFont('helvetica', 'bold');
                 doc.text(c.concepto, leftMargin + 2, y);
                 doc.setFont('helvetica', 'normal');
@@ -650,7 +723,6 @@
                 y += 4;
             });
             
-            // Totales
             y += 5;
             const totalesX = 130;
             doc.setFont('helvetica', 'normal');
@@ -671,7 +743,6 @@
             doc.text('TOTAL', totalesX, y);
             doc.text(formatMoney(total), 188, y, { align: 'right' });
             
-            // IBAN
             if (config.emisor.iban) {
                 y += 20;
                 doc.setFontSize(9);
@@ -683,7 +754,6 @@
                 doc.text(config.emisor.iban, 105, y, { align: 'center' });
             }
             
-            // Footer
             y = 280;
             doc.setDrawColor(200);
             doc.line(leftMargin, y, rightMargin, y);
@@ -693,14 +763,49 @@
             doc.setTextColor(100);
             const footer = [config.emisor.nombre, config.emisor.direccion, config.emisor.localidad, config.emisor.nif, config.emisor.telefono, config.emisor.email].filter(Boolean).join(' | ');
             doc.text(footer, 105, y, { align: 'center', maxWidth: 170 });
+        }
+
+        function generarPDF() {
+            const cl = getClienteData();
+            if (!cl.nombre) { alert('Introduce el nombre del cliente'); return; }
+            if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
             
-            // Guardar PDF
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const nf = getNumeroFactura();
+            const fe = document.getElementById('fecha-emision').value;
+            const fv = document.getElementById('fecha-vencimiento').value;
+            const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
+            const ivaRate = parseInt(config.iva) || 0;
+            const iva = base * (ivaRate / 100);
+            const total = base + iva;
+            
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, iva, total, ivaRate);
             doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
             
-            // Guardar en historial
-            historial.unshift({ numero: nf, cliente: cl.nombre, fecha: fe, total: total });
-            config.ultimoNumero++;
-            document.getElementById('config-ultimo-numero').value = config.ultimoNumero;
+            // Guardar en historial con todos los datos
+            const facturaData = {
+                numero: nf,
+                cliente: cl.nombre,
+                clienteData: { ...cl },
+                fecha: fe,
+                fechaVencimiento: fv,
+                total: total,
+                conceptos: conceptos.map(c => ({...c}))
+            };
+            
+            if (editandoFactura) {
+                // Actualizar factura existente
+                historial[editandoFactura.index] = facturaData;
+                editandoFactura = null;
+                document.getElementById('alert-nueva-factura').style.display = 'block';
+                document.getElementById('alert-editando').style.display = 'none';
+            } else {
+                // Nueva factura
+                historial.unshift(facturaData);
+                config.ultimoNumero++;
+                document.getElementById('config-ultimo-numero').value = config.ultimoNumero;
+            }
+            
             guardarDatos();
             actualizarNumeroFactura();
             renderHistorial();
@@ -708,17 +813,33 @@
             alert('PDF generado correctamente');
         }
 
-        function limpiarFactura() {
-            if (confirm('¿Limpiar factura actual?')) { limpiarCliente(); conceptos = []; addConcepto(); setFechasDefecto(); }
+        function limpiarFactura(skipConfirm = false) {
+            if (skipConfirm || confirm('¿Limpiar factura actual?')) {
+                editandoFactura = null;
+                document.getElementById('alert-nueva-factura').style.display = 'block';
+                document.getElementById('alert-editando').style.display = 'none';
+                limpiarCliente();
+                conceptos = [];
+                addConcepto();
+                setFechasDefecto();
+            }
         }
 
         function renderHistorial() {
             const cont = document.getElementById('historial-list');
             if (historial.length === 0) { cont.innerHTML = '<p style="color: #666;">No hay facturas en el historial.</p>'; return; }
-            cont.innerHTML = historial.map(h => `
+            cont.innerHTML = historial.map((h, index) => `
                 <div class="historial-item">
-                    <div class="historial-info"><h4>${h.numero}</h4><p>${h.cliente} | ${formatDateDisplay(h.fecha)}</p></div>
-                    <div style="font-weight:bold;color:#2196F3;">${formatMoney(h.total)}</div>
+                    <div class="historial-info">
+                        <h4>${h.numero}</h4>
+                        <p>${h.cliente} | ${formatDateDisplay(h.fecha)}</p>
+                    </div>
+                    <div class="historial-total">${formatMoney(h.total)}</div>
+                    <div class="historial-actions">
+                        <button class="btn btn-primary btn-small" onclick="descargarFacturaHistorial(${index})">📄 Descargar</button>
+                        <button class="btn btn-warning btn-small" onclick="editarFactura(${index})">✏️ Editar</button>
+                        <button class="btn btn-danger btn-small" onclick="eliminarFacturaHistorial(${index})">🗑️</button>
+                    </div>
                 </div>
             `).join('');
         }

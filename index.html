@@ -181,15 +181,6 @@
             <div class="form-group"><label>IBAN</label><input type="text" id="emisor-iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
             <h3 class="section-title" style="margin-top: 30px;">Configuración de Facturas</h3>
             <div class="form-row">
-                <div class="form-group">
-                    <label>Aplicar IVA</label>
-                    <select id="config-iva" onchange="toggleIVA()">
-                        <option value="0">Sin IVA</option>
-                        <option value="21">21% (General)</option>
-                        <option value="10">10% (Reducido)</option>
-                        <option value="4">4% (Superreducido)</option>
-                    </select>
-                </div>
                 <div class="form-group"><label>Último nº factura</label><input type="number" id="config-ultimo-numero" value="0" min="0" onchange="actualizarNumeroFactura()"></div>
             </div>
             <button class="btn btn-success" onclick="guardarConfiguracion()" style="margin-top: 20px;">💾 Guardar configuración</button>
@@ -208,10 +199,10 @@
         
         let conceptos = [];
         let clienteSeleccionado = null;
-        let config = { emisor: {}, iva: 0, ultimoNumero: 0, logo: null };
+        let config = { emisor: {}, ultimoNumero: 0, logo: null };
         let clientes = [];
         let historial = [];
-        let editandoFactura = null; // Para saber si estamos editando una factura existente
+        let editandoFactura = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             cargarDatos();
@@ -271,7 +262,7 @@
         function updateConcepto(id, field, value) {
             const c = conceptos.find(c => c.id === id);
             if (c) c[field] = (field === 'precio' || field === 'unidades') ? (parseFloat(value) || 0) : value;
-            calcularTotales();
+            renderConceptos();
         }
 
         function renderConceptos() {
@@ -284,20 +275,20 @@
                     <div class="concepto-campos">
                         <div class="form-group" style="margin-bottom: 10px;">
                             <span class="small-label">Concepto (título corto)</span>
-                            <input type="text" placeholder="Ej: Encalado, Enlucido, Lijado" value="${c.concepto}" onchange="updateConcepto(${c.id}, 'concepto', this.value)">
+                            <input type="text" placeholder="Ej: Encalado, Enlucido, Lijado" value="${c.concepto}" oninput="updateConcepto(${c.id}, 'concepto', this.value)">
                         </div>
                         <div class="form-group" style="margin-bottom: 10px;">
                             <span class="small-label">Descripción del trabajo</span>
-                            <textarea placeholder="Ej: Horas trabajadas en encalado de paredes con mortero..." onchange="updateConcepto(${c.id}, 'descripcion', this.value)">${c.descripcion}</textarea>
+                            <textarea placeholder="Ej: Horas trabajadas en encalado de paredes con mortero..." oninput="updateConcepto(${c.id}, 'descripcion', this.value)">${c.descripcion}</textarea>
                         </div>
                         <div class="concepto-fila">
                             <div>
                                 <span class="small-label">Precio unitario (€)</span>
-                                <input type="number" placeholder="0.00" value="${c.precio}" step="0.01" min="0" onchange="updateConcepto(${c.id}, 'precio', this.value)">
+                                <input type="number" placeholder="0.00" value="${c.precio}" step="0.01" min="0" oninput="updateConcepto(${c.id}, 'precio', this.value)">
                             </div>
                             <div>
                                 <span class="small-label">Unidades</span>
-                                <input type="number" placeholder="1" value="${c.unidades}" min="1" onchange="updateConcepto(${c.id}, 'unidades', this.value)">
+                                <input type="number" placeholder="1" value="${c.unidades}" min="0.01" step="0.01" oninput="updateConcepto(${c.id}, 'unidades', this.value)">
                             </div>
                             <div>
                                 <span class="small-label">Subtotal</span>
@@ -312,16 +303,9 @@
 
         function calcularTotales() {
             const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
-            const ivaRate = parseInt(config.iva) || 0;
-            const iva = base * (ivaRate / 100);
             document.getElementById('base-imponible').textContent = formatMoney(base);
-            document.getElementById('total-factura').textContent = formatMoney(base + iva);
-            const rowIva = document.getElementById('row-iva');
-            if (ivaRate > 0) {
-                rowIva.style.display = 'flex';
-                document.getElementById('iva-porcentaje').textContent = ivaRate;
-                document.getElementById('iva-total').textContent = formatMoney(iva);
-            } else rowIva.style.display = 'none';
+            document.getElementById('total-factura').textContent = formatMoney(base);
+            document.getElementById('row-iva').style.display = 'none';
         }
 
         function formatMoney(n) { return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '€'; }
@@ -380,11 +364,24 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = e => {
-                    config.logo = e.target.result;
-                    document.getElementById('logo-preview').src = config.logo;
-                    document.getElementById('logo-preview').style.display = 'block';
-                    document.getElementById('btn-eliminar-logo').style.display = 'inline-block';
-                    guardarDatos();
+                    // Comprimir logo
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const maxSize = 200;
+                        let w = img.width, h = img.height;
+                        if (w > h) { if (w > maxSize) { h *= maxSize / w; w = maxSize; } }
+                        else { if (h > maxSize) { w *= maxSize / h; h = maxSize; } }
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        config.logo = canvas.toDataURL('image/jpeg', 0.7);
+                        document.getElementById('logo-preview').src = config.logo;
+                        document.getElementById('logo-preview').style.display = 'block';
+                        document.getElementById('btn-eliminar-logo').style.display = 'inline-block';
+                        guardarDatos();
+                    };
+                    img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
@@ -398,11 +395,8 @@
             guardarDatos();
         }
 
-        function toggleIVA() { config.iva = document.getElementById('config-iva').value; calcularTotales(); }
-
         function guardarConfiguracion() {
             config.emisor = { nombre: document.getElementById('emisor-nombre').value, nif: document.getElementById('emisor-nif').value, direccion: document.getElementById('emisor-direccion').value, localidad: document.getElementById('emisor-localidad').value, provincia: document.getElementById('emisor-provincia').value, pais: document.getElementById('emisor-pais').value, telefono: document.getElementById('emisor-telefono').value, email: document.getElementById('emisor-email').value, iban: document.getElementById('emisor-iban').value };
-            config.iva = document.getElementById('config-iva').value;
             config.ultimoNumero = parseInt(document.getElementById('config-ultimo-numero').value) || 0;
             guardarDatos();
             actualizarNumeroFactura();
@@ -432,7 +426,6 @@
                     document.getElementById('emisor-email').value = config.emisor.email || '';
                     document.getElementById('emisor-iban').value = config.emisor.iban || '';
                 }
-                document.getElementById('config-iva').value = config.iva || 0;
                 document.getElementById('config-ultimo-numero').value = config.ultimoNumero || 0;
                 if (config.logo) {
                     document.getElementById('logo-preview').src = config.logo;
@@ -448,17 +441,12 @@
             return { nombre: document.getElementById('cliente-nombre').value, nif: document.getElementById('cliente-nif').value, direccion: document.getElementById('cliente-direccion').value, localidad: document.getElementById('cliente-localidad').value, provincia: document.getElementById('cliente-provincia').value, telefono: document.getElementById('cliente-telefono').value };
         }
 
-        // =====================
-        // FUNCIONES DE EDICIÓN
-        // =====================
-        
         function editarFactura(index) {
             const factura = historial[index];
             if (!factura) return;
             
             editandoFactura = { ...factura, index };
             
-            // Cargar datos del cliente
             document.getElementById('cliente-nombre').value = factura.clienteData?.nombre || factura.cliente;
             document.getElementById('cliente-nif').value = factura.clienteData?.nif || '';
             document.getElementById('cliente-direccion').value = factura.clienteData?.direccion || '';
@@ -466,21 +454,17 @@
             document.getElementById('cliente-provincia').value = factura.clienteData?.provincia || '';
             document.getElementById('cliente-telefono').value = factura.clienteData?.telefono || '';
             
-            // Cargar conceptos
             conceptos = factura.conceptos ? factura.conceptos.map(c => ({...c, id: Date.now() + Math.random()})) : [];
             if (conceptos.length === 0) addConcepto();
             renderConceptos();
             
-            // Cargar fechas
             document.getElementById('fecha-emision').value = factura.fecha || '';
             document.getElementById('fecha-vencimiento').value = factura.fechaVencimiento || '';
             
-            // Mostrar indicador de edición
             document.getElementById('alert-nueva-factura').style.display = 'none';
             document.getElementById('alert-editando').style.display = 'block';
             document.getElementById('editando-numero').textContent = factura.numero;
             
-            // Cambiar a pestaña de nueva factura
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-nueva').classList.add('active');
@@ -497,20 +481,7 @@
         function descargarFacturaHistorial(index) {
             const factura = historial[index];
             if (!factura) return;
-            
-            // Cargar temporalmente los datos para generar el PDF
-            const tempConceptos = conceptos;
-            const tempEditando = editandoFactura;
-            
-            conceptos = factura.conceptos || [];
-            editandoFactura = factura;
-            
-            // Generar PDF con los datos de la factura guardada
             generarPDFConDatos(factura);
-            
-            // Restaurar datos anteriores
-            conceptos = tempConceptos;
-            editandoFactura = tempEditando;
         }
         
         function eliminarFacturaHistorial(index) {
@@ -527,9 +498,7 @@
             const fv = document.getElementById('fecha-vencimiento').value;
             const nf = getNumeroFactura();
             const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
-            const ivaRate = parseInt(config.iva) || 0;
-            const iva = base * (ivaRate / 100);
-            const total = base + iva;
+            const total = base;
             const logo = config.logo ? `<img src="${config.logo}" style="max-width:120px;max-height:80px;">` : '';
             
             return `<div style="background:white;padding:40px;font-family:'Segoe UI',Tahoma,sans-serif;">
@@ -579,10 +548,10 @@
                 </table>
                 <div style="margin-left:auto;width:250px;">
                     <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>Base Imponible</span><span>${formatMoney(base)}</span></div>
-                    ${ivaRate > 0 ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>IVA (${ivaRate}%)</span><span>${formatMoney(iva)}</span></div>` : ''}
                     <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;background:#FFD700;padding:12px;margin-top:10px;"><span>TOTAL</span><span>${formatMoney(total)}</span></div>
                 </div>
-                ${config.emisor.iban ? `<div style="margin-top:30px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
+                <div style="margin-top:15px;text-align:right;font-style:italic;color:#666;">Exento de IGIC</div>
+                ${config.emisor.iban ? `<div style="margin-top:20px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
                 <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;text-align:center;font-size:0.85rem;color:#666;">
                     ${config.emisor.nombre || ''} | ${config.emisor.direccion || ''} ${config.emisor.localidad || ''} | ${config.emisor.nif || ''} | ${config.emisor.telefono || ''} | ${config.emisor.email || ''}
                 </div>
@@ -604,28 +573,26 @@
         }
         
         function generarPDFConDatos(factura) {
-            const doc = new jsPDF('p', 'mm', 'a4');
+            const doc = new jsPDF({ compress: true });
             const cl = factura.clienteData || { nombre: factura.cliente };
             const nf = factura.numero;
             const fe = factura.fecha;
             const fv = factura.fechaVencimiento || fe;
             const conceptosFactura = factura.conceptos || [];
             const base = conceptosFactura.reduce((s, c) => s + (c.precio * c.unidades), 0);
-            const ivaRate = parseInt(config.iva) || 0;
-            const iva = base * (ivaRate / 100);
-            const total = base + iva;
+            const total = base;
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, iva, total, ivaRate);
-            doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total);
+            doc.save(`${nf}_${(cl.nombre || 'cliente').replace(/\s+/g, '_')}.pdf`);
         }
         
-        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, iva, total, ivaRate) {
+        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total) {
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
             
             if (config.logo) {
-                try { doc.addImage(config.logo, 'PNG', leftMargin, y, 30, 20); } catch(e) {}
+                try { doc.addImage(config.logo, 'JPEG', leftMargin, y, 30, 20); } catch(e) {}
             }
             
             doc.setFontSize(24);
@@ -699,7 +666,7 @@
             
             conceptosFactura.filter(c => c.concepto).forEach(c => {
                 doc.setFont('helvetica', 'bold');
-                doc.text(c.concepto, leftMargin + 2, y);
+                doc.text(c.concepto.substring(0, 40), leftMargin + 2, y);
                 doc.setFont('helvetica', 'normal');
                 doc.text(formatMoney(c.precio), 115, y, { align: 'right' });
                 doc.text(c.unidades.toString(), 135, y, { align: 'right' });
@@ -729,12 +696,6 @@
             doc.text('Base Imponible', totalesX, y);
             doc.text(formatMoney(base), 188, y, { align: 'right' });
             
-            if (ivaRate > 0) {
-                y += 6;
-                doc.text('IVA (' + ivaRate + '%)', totalesX, y);
-                doc.text(formatMoney(iva), 188, y, { align: 'right' });
-            }
-            
             y += 8;
             doc.setFillColor(255, 215, 0);
             doc.rect(totalesX - 2, y - 5, 62, 10, 'F');
@@ -743,12 +704,19 @@
             doc.text('TOTAL', totalesX, y);
             doc.text(formatMoney(total), 188, y, { align: 'right' });
             
+            // Exento de IGIC
+            y += 12;
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'italic');
+            doc.setTextColor(100);
+            doc.text('Exento de IGIC', 188, y, { align: 'right' });
+            
             if (config.emisor.iban) {
-                y += 20;
+                y += 15;
                 doc.setFontSize(9);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(50);
-                doc.text('Pagar por transferencia bancaria al siguiente número de cuenta:', 105, y, { align: 'center' });
+                doc.text('Pagar por transferencia bancaria al siguiente numero de cuenta:', 105, y, { align: 'center' });
                 y += 5;
                 doc.setFont('helvetica', 'bold');
                 doc.text(config.emisor.iban, 105, y, { align: 'center' });
@@ -770,19 +738,16 @@
             if (!cl.nombre) { alert('Introduce el nombre del cliente'); return; }
             if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
             
-            const doc = new jsPDF('p', 'mm', 'a4');
+            const doc = new jsPDF({ compress: true });
             const nf = getNumeroFactura();
             const fe = document.getElementById('fecha-emision').value;
             const fv = document.getElementById('fecha-vencimiento').value;
             const base = conceptos.reduce((s, c) => s + (c.precio * c.unidades), 0);
-            const ivaRate = parseInt(config.iva) || 0;
-            const iva = base * (ivaRate / 100);
-            const total = base + iva;
+            const total = base;
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, iva, total, ivaRate);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, total);
             doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
             
-            // Guardar en historial con todos los datos
             const facturaData = {
                 numero: nf,
                 cliente: cl.nombre,
@@ -794,13 +759,11 @@
             };
             
             if (editandoFactura) {
-                // Actualizar factura existente
                 historial[editandoFactura.index] = facturaData;
                 editandoFactura = null;
                 document.getElementById('alert-nueva-factura').style.display = 'block';
                 document.getElementById('alert-editando').style.display = 'none';
             } else {
-                // Nueva factura
                 historial.unshift(facturaData);
                 config.ultimoNumero++;
                 document.getElementById('config-ultimo-numero').value = config.ultimoNumero;

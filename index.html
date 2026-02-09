@@ -261,7 +261,6 @@
             renderConceptos();
         }
 
-        // Actualiza solo el valor sin redibujar
         function updateConceptoValue(id, field, value) {
             const c = conceptos.find(c => c.id === id);
             if (c) {
@@ -271,7 +270,6 @@
             }
         }
 
-        // Actualiza solo el subtotal de un concepto específico
         function actualizarSubtotal(id) {
             const c = conceptos.find(c => c.id === id);
             if (c) {
@@ -555,7 +553,7 @@
                         <p style="margin:5px 0;color:#555;">${config.emisor.nif || ''}</p>
                         <p style="margin:5px 0;color:#555;">${config.emisor.direccion || ''}</p>
                         <p style="margin:5px 0;color:#555;">${config.emisor.localidad || ''}${config.emisor.provincia ? ', ' + config.emisor.provincia : ''}</p>
-                        ${config.emisor.telefono ? `<p style="margin:5px 0;color:#555;">Tel: ${config.emisor.telefono}</p>` : ''}
+                        ${config.emisor.telefono ? `<p style="margin:5px 0;color:#555;">${config.emisor.telefono}</p>` : ''}
                         ${config.emisor.email ? `<p style="margin:5px 0;color:#555;">${config.emisor.email}</p>` : ''}
                     </div>
                 </div>
@@ -622,6 +620,8 @@
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
+            const emisorX = 110; // Columna del emisor
+            const maxWidthEmisor = 80; // Ancho máximo para texto del emisor
             
             if (config.logo) {
                 try { doc.addImage(config.logo, 'JPEG', leftMargin, y, 30, 20); } catch(e) {}
@@ -644,43 +644,75 @@
             doc.setLineWidth(1);
             doc.line(leftMargin, y, rightMargin, y);
             
+            // Títulos
             y += 10;
             doc.setFontSize(9);
             doc.setTextColor(100);
             doc.setFont('helvetica', 'bold');
             doc.text('CLIENTE', leftMargin, y);
-            doc.text('EMISOR', 115, y);
+            doc.text('EMISOR', emisorX, y);
             
-            y += 6;
+            // Datos del cliente (columna izquierda)
+            let yCliente = y + 6;
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50);
             doc.setFontSize(10);
-            doc.text(cl.nombre || '', leftMargin, y);
-            doc.text(config.emisor.nombre || 'Sin configurar', 115, y);
+            doc.text(cl.nombre || '', leftMargin, yCliente);
             
-            y += 5;
+            yCliente += 5;
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
-            doc.text(cl.nif || '', leftMargin, y);
-            doc.text(config.emisor.nif || '', 115, y);
-            
-            y += 5;
-            doc.text(cl.direccion || '', leftMargin, y);
-            doc.text(config.emisor.direccion || '', 115, y);
-            
-            y += 5;
-            doc.text((cl.localidad || '') + (cl.provincia ? ', ' + cl.provincia : ''), leftMargin, y);
-            doc.text((config.emisor.localidad || '') + (config.emisor.provincia ? ', ' + config.emisor.provincia : ''), 115, y);
-            
-            if (cl.telefono) { y += 5; doc.text('Tel: ' + cl.telefono, leftMargin, y); }
-            if (config.emisor.telefono) { doc.text('Tel: ' + config.emisor.telefono, 115, y); }
-            
-            y += 5;
+            if (cl.nif) { doc.text(cl.nif, leftMargin, yCliente); yCliente += 5; }
+            if (cl.direccion) { doc.text(cl.direccion, leftMargin, yCliente); yCliente += 5; }
+            if (cl.localidad) { 
+                doc.text(cl.localidad + (cl.provincia ? ', ' + cl.provincia : ''), leftMargin, yCliente); 
+                yCliente += 5; 
+            }
+            if (cl.telefono) { doc.text('Tel: ' + cl.telefono, leftMargin, yCliente); yCliente += 5; }
+            yCliente += 3;
             doc.setFont('helvetica', 'bold');
-            doc.text('Vencimiento: ' + formatDateDisplay(fv), leftMargin, y);
-            if (config.emisor.email) { doc.setFont('helvetica', 'normal'); doc.text(config.emisor.email, 115, y); }
+            doc.text('Vencimiento: ' + formatDateDisplay(fv), leftMargin, yCliente);
             
-            y += 15;
+            // Datos del emisor (columna derecha) - cada campo en su línea
+            let yEmisor = y + 6;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(50);
+            doc.setFontSize(10);
+            doc.text(config.emisor.nombre || 'Sin configurar', emisorX, yEmisor);
+            
+            yEmisor += 5;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            
+            if (config.emisor.nif) { 
+                doc.text(config.emisor.nif, emisorX, yEmisor); 
+                yEmisor += 5; 
+            }
+            if (config.emisor.direccion) { 
+                // Dividir dirección si es muy larga
+                const lineasDireccion = doc.splitTextToSize(config.emisor.direccion, maxWidthEmisor);
+                doc.text(lineasDireccion, emisorX, yEmisor);
+                yEmisor += lineasDireccion.length * 4;
+            }
+            if (config.emisor.localidad) { 
+                const localidadCompleta = config.emisor.localidad + (config.emisor.provincia ? ', ' + config.emisor.provincia : '');
+                const lineasLocalidad = doc.splitTextToSize(localidadCompleta, maxWidthEmisor);
+                doc.text(lineasLocalidad, emisorX, yEmisor);
+                yEmisor += lineasLocalidad.length * 4;
+            }
+            if (config.emisor.telefono) { 
+                doc.text(config.emisor.telefono, emisorX, yEmisor); 
+                yEmisor += 5; 
+            }
+            if (config.emisor.email) { 
+                doc.text(config.emisor.email, emisorX, yEmisor); 
+                yEmisor += 5; 
+            }
+            
+            // Usar la posición Y más baja entre cliente y emisor
+            y = Math.max(yCliente, yEmisor) + 10;
+            
+            // Tabla de conceptos
             doc.setFillColor(255, 215, 0);
             doc.rect(leftMargin, y, 170, 8, 'F');
             doc.setTextColor(0);
@@ -756,6 +788,7 @@
                 doc.text(config.emisor.iban, 105, y, { align: 'center' });
             }
             
+            // Footer
             y = 280;
             doc.setDrawColor(200);
             doc.line(leftMargin, y, rightMargin, y);
@@ -763,7 +796,7 @@
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(100);
-            const footer = [config.emisor.nombre, config.emisor.direccion, config.emisor.localidad, config.emisor.nif, config.emisor.telefono, config.emisor.email].filter(Boolean).join(' | ');
+            const footer = [config.emisor.nombre, config.emisor.nif, config.emisor.telefono, config.emisor.email].filter(Boolean).join(' | ');
             doc.text(footer, 105, y, { align: 'center', maxWidth: 170 });
         }
 
@@ -782,7 +815,6 @@
             generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, total);
             doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
             
-            // Guardar conceptos con valores numéricos
             const conceptosGuardar = conceptos.map(c => ({
                 ...c,
                 precio: parseFloat(c.precio) || 0,

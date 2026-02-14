@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facturación - Reformas y Construcción</title>
+    <title>Facturación y Presupuestos - Reformas y Construcción</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,6 +33,8 @@
         .btn-secondary:hover { background: #616161; }
         .btn-warning { background: #FF9800; color: white; }
         .btn-warning:hover { background: #F57C00; }
+        .btn-purple { background: #9C27B0; color: white; }
+        .btn-purple:hover { background: #7B1FA2; }
         .btn-small { padding: 8px 12px; font-size: 0.85rem; }
         .conceptos-list { margin-top: 20px; }
         .concepto-item { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #2196F3; }
@@ -53,17 +55,22 @@
         .total-row:last-child { border-bottom: none; font-size: 1.2rem; font-weight: bold; }
         .historial-list { display: grid; gap: 10px; }
         .historial-item { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .historial-item.presupuesto { border-left: 4px solid #9C27B0; }
+        .historial-item.factura { border-left: 4px solid #2196F3; }
         .historial-info h4 { margin-bottom: 5px; }
         .historial-info p { color: #666; font-size: 0.9rem; }
         .historial-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .historial-total { font-weight: bold; color: #2196F3; font-size: 1.1rem; min-width: 100px; text-align: right; }
+        .historial-total.presupuesto { color: #9C27B0; }
         .logo-preview { max-width: 150px; max-height: 100px; margin-top: 10px; display: block; }
         @media (max-width: 768px) { .concepto-fila { grid-template-columns: 1fr 1fr; } .historial-item { flex-direction: column; align-items: flex-start; } }
         @media (max-width: 500px) { .concepto-fila { grid-template-columns: 1fr; } }
         .actions-bar { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
         .numero-factura { font-size: 1.2rem; color: #2196F3; font-weight: bold; }
+        .numero-factura.presupuesto { color: #9C27B0; }
         .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
         .alert-info { background: #e3f2fd; color: #1565c0; }
+        .alert-info.presupuesto { background: #f3e5f5; color: #7b1fa2; }
         .alert-success { background: #e8f5e9; color: #2e7d32; }
         .alert-warning { background: #fff3e0; color: #e65100; }
         .conceptos-rapidos { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
@@ -71,25 +78,41 @@
         .concepto-rapido:hover { background: #bbdefb; }
         .section-title { font-size: 1.2rem; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
         .small-label { font-size: 0.85rem; color: #666; margin-bottom: 5px; display: block; }
-        .editing-badge { background: #FF9800; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-left: 10px; }
+        .tipo-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tipo-btn { flex: 1; padding: 15px; border: 3px solid #e0e0e0; background: white; cursor: pointer; border-radius: 8px; font-size: 1rem; font-weight: 600; transition: all 0.3s; }
+        .tipo-btn:hover { border-color: #bbb; }
+        .tipo-btn.active.factura { border-color: #2196F3; background: #e3f2fd; color: #1565c0; }
+        .tipo-btn.active.presupuesto { border-color: #9C27B0; background: #f3e5f5; color: #7b1fa2; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-left: 8px; }
+        .badge-factura { background: #e3f2fd; color: #1565c0; }
+        .badge-presupuesto { background: #f3e5f5; color: #7b1fa2; }
+        .filtro-historial { display: flex; gap: 10px; margin-bottom: 15px; }
+        .filtro-btn { padding: 8px 16px; border: 2px solid #e0e0e0; background: white; cursor: pointer; border-radius: 20px; font-size: 0.9rem; transition: all 0.3s; }
+        .filtro-btn:hover { border-color: #bbb; }
+        .filtro-btn.active { border-color: #2196F3; background: #e3f2fd; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏗️ Facturación - Reformas y Construcción</h1>
+        <h1>🏗️ Facturación y Presupuestos</h1>
         <div class="tabs">
-            <button class="tab-btn active" onclick="showTab('nueva')">📝 Nueva Factura</button>
+            <button class="tab-btn active" onclick="showTab('nueva')">📝 Nuevo</button>
             <button class="tab-btn" onclick="showTab('clientes')">👥 Clientes</button>
             <button class="tab-btn" onclick="showTab('historial')">📋 Historial</button>
             <button class="tab-btn" onclick="showTab('config')">⚙️ Configuración</button>
         </div>
 
         <div id="tab-nueva" class="tab-content active">
+            <div class="tipo-selector">
+                <button class="tipo-btn factura active" onclick="setTipoDocumento('factura')">📄 Factura</button>
+                <button class="tipo-btn presupuesto" onclick="setTipoDocumento('presupuesto')">📋 Presupuesto</button>
+            </div>
+            
             <div class="alert alert-info" id="alert-nueva-factura">
-                <strong>Próxima factura:</strong> <span id="proxima-factura" class="numero-factura">F26-001</span>
+                <strong>Próximo documento:</strong> <span id="proxima-factura" class="numero-factura">F26-001</span>
             </div>
             <div class="alert alert-warning" id="alert-editando" style="display: none;">
-                <strong>✏️ Editando factura:</strong> <span id="editando-numero"></span>
+                <strong>✏️ Editando:</strong> <span id="editando-numero"></span>
                 <button class="btn btn-secondary btn-small" onclick="cancelarEdicion()" style="margin-left: 15px;">Cancelar edición</button>
             </div>
             
@@ -134,11 +157,11 @@
             <h3 class="section-title" style="margin-top: 30px;">Fechas</h3>
             <div class="form-row">
                 <div class="form-group"><label>Fecha de emisión</label><input type="date" id="fecha-emision"></div>
-                <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="fecha-vencimiento"></div>
+                <div class="form-group"><label id="label-vencimiento">Fecha de vencimiento</label><input type="date" id="fecha-vencimiento"></div>
             </div>
             <div class="actions-bar">
                 <button class="btn btn-success" onclick="previsualizarFactura()">👁️ Previsualizar</button>
-                <button class="btn btn-primary" onclick="generarPDF()">📄 Generar PDF</button>
+                <button class="btn btn-primary" onclick="generarPDF()" id="btn-generar">📄 Generar PDF</button>
                 <button class="btn btn-danger" onclick="limpiarFactura()">🗑️ Limpiar</button>
             </div>
         </div>
@@ -149,8 +172,13 @@
         </div>
 
         <div id="tab-historial" class="tab-content">
-            <h3 class="section-title">Historial de Facturas</h3>
-            <div id="historial-list" class="historial-list"><p style="color: #666;">No hay facturas en el historial.</p></div>
+            <h3 class="section-title">Historial</h3>
+            <div class="filtro-historial">
+                <button class="filtro-btn active" onclick="filtrarHistorial('todos')">Todos</button>
+                <button class="filtro-btn" onclick="filtrarHistorial('factura')">📄 Facturas</button>
+                <button class="filtro-btn" onclick="filtrarHistorial('presupuesto')">📋 Presupuestos</button>
+            </div>
+            <div id="historial-list" class="historial-list"><p style="color: #666;">No hay documentos en el historial.</p></div>
         </div>
 
         <div id="tab-config" class="tab-content">
@@ -178,9 +206,10 @@
                 <div class="form-group"><label>Email</label><input type="email" id="emisor-email" placeholder="tu@email.com"></div>
             </div>
             <div class="form-group"><label>IBAN</label><input type="text" id="emisor-iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
-            <h3 class="section-title" style="margin-top: 30px;">Configuración de Facturas</h3>
+            <h3 class="section-title" style="margin-top: 30px;">Numeración</h3>
             <div class="form-row">
                 <div class="form-group"><label>Último nº factura</label><input type="number" id="config-ultimo-numero" value="0" min="0" onchange="actualizarNumeroFactura()"></div>
+                <div class="form-group"><label>Último nº presupuesto</label><input type="number" id="config-ultimo-presupuesto" value="0" min="0" onchange="actualizarNumeroFactura()"></div>
             </div>
             <button class="btn btn-success" onclick="guardarConfiguracion()" style="margin-top: 20px;">💾 Guardar configuración</button>
         </div>
@@ -198,10 +227,12 @@
         
         let conceptos = [];
         let clienteSeleccionado = null;
-        let config = { emisor: {}, ultimoNumero: 0, logo: null };
+        let config = { emisor: {}, ultimoNumero: 0, ultimoPresupuesto: 0, logo: null };
         let clientes = [];
         let historial = [];
         let editandoFactura = null;
+        let tipoDocumento = 'factura'; // 'factura' o 'presupuesto'
+        let filtroActual = 'todos';
 
         document.addEventListener('DOMContentLoaded', () => {
             cargarDatos();
@@ -210,7 +241,33 @@
             renderClientes();
             renderHistorial();
             addConcepto();
+            actualizarInterfazTipo();
         });
+
+        function setTipoDocumento(tipo) {
+            tipoDocumento = tipo;
+            actualizarInterfazTipo();
+            actualizarNumeroFactura();
+        }
+
+        function actualizarInterfazTipo() {
+            document.querySelectorAll('.tipo-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tipo-btn.${tipoDocumento}`).classList.add('active');
+            
+            const alertDiv = document.getElementById('alert-nueva-factura');
+            const numeroSpan = document.getElementById('proxima-factura');
+            const labelVenc = document.getElementById('label-vencimiento');
+            
+            if (tipoDocumento === 'presupuesto') {
+                alertDiv.classList.add('presupuesto');
+                numeroSpan.classList.add('presupuesto');
+                labelVenc.textContent = 'Válido hasta';
+            } else {
+                alertDiv.classList.remove('presupuesto');
+                numeroSpan.classList.remove('presupuesto');
+                labelVenc.textContent = 'Fecha de vencimiento';
+            }
+        }
 
         function showTab(tab) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -222,7 +279,7 @@
         function setFechasDefecto() {
             const hoy = new Date();
             const venc = new Date();
-            venc.setDate(venc.getDate() + 7);
+            venc.setDate(venc.getDate() + 15);
             document.getElementById('fecha-emision').value = hoy.toISOString().split('T')[0];
             document.getElementById('fecha-vencimiento').value = venc.toISOString().split('T')[0];
         }
@@ -231,17 +288,24 @@
             return new Date(dateStr).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
-        function getNumeroFactura() {
+        function getNumeroDocumento() {
             if (editandoFactura) return editandoFactura.numero;
             const año = new Date().getFullYear().toString().slice(-2);
-            const numero = (config.ultimoNumero + 1).toString().padStart(3, '0');
-            return `F${año}-${numero}`;
+            if (tipoDocumento === 'presupuesto') {
+                const numero = (config.ultimoPresupuesto + 1).toString().padStart(3, '0');
+                return `P${año}-${numero}`;
+            } else {
+                const numero = (config.ultimoNumero + 1).toString().padStart(3, '0');
+                return `F${año}-${numero}`;
+            }
         }
 
         function actualizarNumeroFactura() {
-            const input = document.getElementById('config-ultimo-numero');
-            if (input) config.ultimoNumero = parseInt(input.value) || 0;
-            document.getElementById('proxima-factura').textContent = getNumeroFactura();
+            const inputFactura = document.getElementById('config-ultimo-numero');
+            const inputPresupuesto = document.getElementById('config-ultimo-presupuesto');
+            if (inputFactura) config.ultimoNumero = parseInt(inputFactura.value) || 0;
+            if (inputPresupuesto) config.ultimoPresupuesto = parseInt(inputPresupuesto.value) || 0;
+            document.getElementById('proxima-factura').textContent = getNumeroDocumento();
         }
 
         function addConcepto(concepto = '', descripcion = '', precio = '', unidades = '') {
@@ -420,6 +484,7 @@
         function guardarConfiguracion() {
             config.emisor = { nombre: document.getElementById('emisor-nombre').value, nif: document.getElementById('emisor-nif').value, direccion: document.getElementById('emisor-direccion').value, localidad: document.getElementById('emisor-localidad').value, provincia: document.getElementById('emisor-provincia').value, pais: document.getElementById('emisor-pais').value, telefono: document.getElementById('emisor-telefono').value, email: document.getElementById('emisor-email').value, iban: document.getElementById('emisor-iban').value };
             config.ultimoNumero = parseInt(document.getElementById('config-ultimo-numero').value) || 0;
+            config.ultimoPresupuesto = parseInt(document.getElementById('config-ultimo-presupuesto').value) || 0;
             guardarDatos();
             actualizarNumeroFactura();
             alert('Configuración guardada');
@@ -449,6 +514,7 @@
                     document.getElementById('emisor-iban').value = config.emisor.iban || '';
                 }
                 document.getElementById('config-ultimo-numero').value = config.ultimoNumero || 0;
+                document.getElementById('config-ultimo-presupuesto').value = config.ultimoPresupuesto || 0;
                 if (config.logo) {
                     document.getElementById('logo-preview').src = config.logo;
                     document.getElementById('logo-preview').style.display = 'block';
@@ -468,6 +534,8 @@
             if (!factura) return;
             
             editandoFactura = { ...factura, index };
+            tipoDocumento = factura.tipo || 'factura';
+            actualizarInterfazTipo();
             
             document.getElementById('cliente-nombre').value = factura.clienteData?.nombre || factura.cliente;
             document.getElementById('cliente-nif').value = factura.clienteData?.nif || '';
@@ -511,29 +579,78 @@
             generarPDFConDatos(factura);
         }
         
+        function convertirAFactura(index) {
+            const presupuesto = historial[index];
+            if (!presupuesto || presupuesto.tipo !== 'presupuesto') return;
+            
+            if (!confirm('¿Convertir este presupuesto en factura?')) return;
+            
+            // Cargar datos del presupuesto
+            tipoDocumento = 'factura';
+            actualizarInterfazTipo();
+            editandoFactura = null; // No estamos editando, es nuevo
+            
+            document.getElementById('cliente-nombre').value = presupuesto.clienteData?.nombre || presupuesto.cliente;
+            document.getElementById('cliente-nif').value = presupuesto.clienteData?.nif || '';
+            document.getElementById('cliente-direccion').value = presupuesto.clienteData?.direccion || '';
+            document.getElementById('cliente-localidad').value = presupuesto.clienteData?.localidad || '';
+            document.getElementById('cliente-provincia').value = presupuesto.clienteData?.provincia || '';
+            document.getElementById('cliente-telefono').value = presupuesto.clienteData?.telefono || '';
+            
+            conceptos = presupuesto.conceptos ? presupuesto.conceptos.map(c => ({
+                ...c, 
+                id: Date.now() + Math.random(),
+                precio: c.precio.toString(),
+                unidades: c.unidades.toString()
+            })) : [];
+            if (conceptos.length === 0) addConcepto();
+            renderConceptos();
+            
+            setFechasDefecto();
+            actualizarNumeroFactura();
+            
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-nueva').classList.add('active');
+            document.querySelector('.tab-btn').classList.add('active');
+            
+            alert('Datos del presupuesto cargados. Revisa y genera la factura.');
+        }
+        
         function eliminarFacturaHistorial(index) {
-            if (confirm('¿Eliminar esta factura del historial?')) {
+            if (confirm('¿Eliminar este documento del historial?')) {
                 historial.splice(index, 1);
                 guardarDatos();
                 renderHistorial();
             }
+        }
+        
+        function filtrarHistorial(filtro) {
+            filtroActual = filtro;
+            document.querySelectorAll('.filtro-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderHistorial();
         }
 
         function generarHTMLFactura() {
             const cl = getClienteData();
             const fe = document.getElementById('fecha-emision').value;
             const fv = document.getElementById('fecha-vencimiento').value;
-            const nf = getNumeroFactura();
+            const nf = getNumeroDocumento();
             const base = conceptos.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
             const total = base;
             const logo = config.logo ? `<img src="${config.logo}" style="max-width:120px;max-height:80px;">` : '';
+            const esPresupuesto = tipoDocumento === 'presupuesto';
+            const titulo = esPresupuesto ? 'PRESUPUESTO' : 'FACTURA';
+            const colorPrincipal = esPresupuesto ? '#9C27B0' : '#2196F3';
+            const labelFechaVenc = esPresupuesto ? 'Válido hasta:' : 'Vencimiento:';
             
             return `<div style="background:white;padding:40px;font-family:'Segoe UI',Tahoma,sans-serif;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #FFD700;">
                     ${logo}
                     <div style="text-align:right;">
-                        <h2 style="font-size:2rem;color:#333;margin:0;">FACTURA</h2>
-                        <div style="color:#2196F3;font-weight:bold;margin-top:5px;">${nf}</div>
+                        <h2 style="font-size:2rem;color:#333;margin:0;">${titulo}</h2>
+                        <div style="color:${colorPrincipal};font-weight:bold;margin-top:5px;">${nf}</div>
                         <div style="color:#666;margin-top:5px;">${formatDateDisplay(fe)}</div>
                     </div>
                 </div>
@@ -545,7 +662,7 @@
                         <p style="margin:5px 0;color:#555;">${cl.direccion}</p>
                         <p style="margin:5px 0;color:#555;">${cl.localidad}${cl.provincia ? ', ' + cl.provincia : ''}</p>
                         ${cl.telefono ? `<p style="margin:5px 0;color:#555;">Tel: ${cl.telefono}</p>` : ''}
-                        <p style="margin-top:10px;color:#555;"><strong>Vencimiento:</strong> ${formatDateDisplay(fv)}</p>
+                        <p style="margin-top:10px;color:#555;"><strong>${labelFechaVenc}</strong> ${formatDateDisplay(fv)}</p>
                     </div>
                     <div>
                         <h4 style="color:#333;margin:0 0 10px 0;font-size:0.9rem;text-transform:uppercase;">Emisor</h4>
@@ -581,7 +698,7 @@
                     <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;background:#FFD700;padding:12px;margin-top:10px;"><span>TOTAL</span><span>${formatMoney(total)}</span></div>
                 </div>
                 <div style="margin-top:15px;text-align:right;font-style:italic;color:#666;">Exento de IGIC</div>
-                ${config.emisor.iban ? `<div style="margin-top:20px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
+                ${!esPresupuesto && config.emisor.iban ? `<div style="margin-top:20px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
                 <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;text-align:center;font-size:0.85rem;color:#666;">
                     ${config.emisor.nombre || ''} | ${config.emisor.direccion || ''} ${config.emisor.localidad || ''} | ${config.emisor.nif || ''} | ${config.emisor.telefono || ''} | ${config.emisor.email || ''}
                 </div>
@@ -611,17 +728,21 @@
             const conceptosFactura = factura.conceptos || [];
             const base = conceptosFactura.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
             const total = base;
+            const tipo = factura.tipo || 'factura';
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo);
             doc.save(`${nf}_${(cl.nombre || 'cliente').replace(/\s+/g, '_')}.pdf`);
         }
         
-        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total) {
+        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo) {
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
-            const emisorX = 110; // Columna del emisor
-            const maxWidthEmisor = 80; // Ancho máximo para texto del emisor
+            const emisorX = 110;
+            const maxWidthEmisor = 80;
+            const esPresupuesto = tipo === 'presupuesto';
+            const titulo = esPresupuesto ? 'PRESUPUESTO' : 'FACTURA';
+            const labelFechaVenc = esPresupuesto ? 'Valido hasta: ' : 'Vencimiento: ';
             
             if (config.logo) {
                 try { doc.addImage(config.logo, 'JPEG', leftMargin, y, 30, 20); } catch(e) {}
@@ -629,10 +750,10 @@
             
             doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
-            doc.text('FACTURA', rightMargin, y + 5, { align: 'right' });
+            doc.text(titulo, rightMargin, y + 5, { align: 'right' });
             
             doc.setFontSize(12);
-            doc.setTextColor(33, 150, 243);
+            doc.setTextColor(esPresupuesto ? 156 : 33, esPresupuesto ? 39 : 150, esPresupuesto ? 176 : 243);
             doc.text(nf, rightMargin, y + 12, { align: 'right' });
             
             doc.setTextColor(100);
@@ -644,7 +765,6 @@
             doc.setLineWidth(1);
             doc.line(leftMargin, y, rightMargin, y);
             
-            // Títulos
             y += 10;
             doc.setFontSize(9);
             doc.setTextColor(100);
@@ -652,7 +772,6 @@
             doc.text('CLIENTE', leftMargin, y);
             doc.text('EMISOR', emisorX, y);
             
-            // Datos del cliente (columna izquierda)
             let yCliente = y + 6;
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50);
@@ -671,9 +790,8 @@
             if (cl.telefono) { doc.text('Tel: ' + cl.telefono, leftMargin, yCliente); yCliente += 5; }
             yCliente += 3;
             doc.setFont('helvetica', 'bold');
-            doc.text('Vencimiento: ' + formatDateDisplay(fv), leftMargin, yCliente);
+            doc.text(labelFechaVenc + formatDateDisplay(fv), leftMargin, yCliente);
             
-            // Datos del emisor (columna derecha) - cada campo en su línea
             let yEmisor = y + 6;
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50);
@@ -689,7 +807,6 @@
                 yEmisor += 5; 
             }
             if (config.emisor.direccion) { 
-                // Dividir dirección si es muy larga
                 const lineasDireccion = doc.splitTextToSize(config.emisor.direccion, maxWidthEmisor);
                 doc.text(lineasDireccion, emisorX, yEmisor);
                 yEmisor += lineasDireccion.length * 4;
@@ -709,10 +826,8 @@
                 yEmisor += 5; 
             }
             
-            // Usar la posición Y más baja entre cliente y emisor
             y = Math.max(yCliente, yEmisor) + 10;
             
-            // Tabla de conceptos
             doc.setFillColor(255, 215, 0);
             doc.rect(leftMargin, y, 170, 8, 'F');
             doc.setTextColor(0);
@@ -777,7 +892,7 @@
             doc.setTextColor(100);
             doc.text('Exento de IGIC', 188, y, { align: 'right' });
             
-            if (config.emisor.iban) {
+            if (!esPresupuesto && config.emisor.iban) {
                 y += 15;
                 doc.setFontSize(9);
                 doc.setFont('helvetica', 'normal');
@@ -788,7 +903,6 @@
                 doc.text(config.emisor.iban, 105, y, { align: 'center' });
             }
             
-            // Footer
             y = 280;
             doc.setDrawColor(200);
             doc.line(leftMargin, y, rightMargin, y);
@@ -806,13 +920,13 @@
             if (conceptos.filter(c => c.concepto).length === 0) { alert('Añade al menos un concepto'); return; }
             
             const doc = new jsPDF({ compress: true });
-            const nf = getNumeroFactura();
+            const nf = getNumeroDocumento();
             const fe = document.getElementById('fecha-emision').value;
             const fv = document.getElementById('fecha-vencimiento').value;
             const base = conceptos.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
             const total = base;
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, total);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, total, tipoDocumento);
             doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
             
             const conceptosGuardar = conceptos.map(c => ({
@@ -828,7 +942,8 @@
                 fecha: fe,
                 fechaVencimiento: fv,
                 total: total,
-                conceptos: conceptosGuardar
+                conceptos: conceptosGuardar,
+                tipo: tipoDocumento
             };
             
             if (editandoFactura) {
@@ -838,8 +953,13 @@
                 document.getElementById('alert-editando').style.display = 'none';
             } else {
                 historial.unshift(facturaData);
-                config.ultimoNumero++;
-                document.getElementById('config-ultimo-numero').value = config.ultimoNumero;
+                if (tipoDocumento === 'presupuesto') {
+                    config.ultimoPresupuesto++;
+                    document.getElementById('config-ultimo-presupuesto').value = config.ultimoPresupuesto;
+                } else {
+                    config.ultimoNumero++;
+                    document.getElementById('config-ultimo-numero').value = config.ultimoNumero;
+                }
             }
             
             guardarDatos();
@@ -850,7 +970,7 @@
         }
 
         function limpiarFactura(skipConfirm = false) {
-            if (skipConfirm || confirm('¿Limpiar factura actual?')) {
+            if (skipConfirm || confirm('¿Limpiar documento actual?')) {
                 editandoFactura = null;
                 document.getElementById('alert-nueva-factura').style.display = 'block';
                 document.getElementById('alert-editando').style.display = 'none';
@@ -863,21 +983,36 @@
 
         function renderHistorial() {
             const cont = document.getElementById('historial-list');
-            if (historial.length === 0) { cont.innerHTML = '<p style="color: #666;">No hay facturas en el historial.</p>'; return; }
-            cont.innerHTML = historial.map((h, index) => `
-                <div class="historial-item">
+            let items = historial;
+            
+            if (filtroActual !== 'todos') {
+                items = historial.filter(h => (h.tipo || 'factura') === filtroActual);
+            }
+            
+            if (items.length === 0) { 
+                cont.innerHTML = '<p style="color: #666;">No hay documentos en el historial.</p>'; 
+                return; 
+            }
+            
+            cont.innerHTML = items.map((h, i) => {
+                const index = historial.indexOf(h);
+                const tipo = h.tipo || 'factura';
+                const esPresupuesto = tipo === 'presupuesto';
+                return `
+                <div class="historial-item ${tipo}">
                     <div class="historial-info">
-                        <h4>${h.numero}</h4>
+                        <h4>${h.numero} <span class="badge badge-${tipo}">${esPresupuesto ? 'Presupuesto' : 'Factura'}</span></h4>
                         <p>${h.cliente} | ${formatDateDisplay(h.fecha)}</p>
                     </div>
-                    <div class="historial-total">${formatMoney(h.total)}</div>
+                    <div class="historial-total ${esPresupuesto ? 'presupuesto' : ''}">${formatMoney(h.total)}</div>
                     <div class="historial-actions">
                         <button class="btn btn-primary btn-small" onclick="descargarFacturaHistorial(${index})">📄 Descargar</button>
+                        ${esPresupuesto ? `<button class="btn btn-success btn-small" onclick="convertirAFactura(${index})">➡️ A Factura</button>` : ''}
                         <button class="btn btn-warning btn-small" onclick="editarFactura(${index})">✏️ Editar</button>
                         <button class="btn btn-danger btn-small" onclick="eliminarFacturaHistorial(${index})">🗑️</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
     </script>
 </body>

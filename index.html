@@ -57,11 +57,14 @@
         .historial-item { background: #f9f9f9; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .historial-item.presupuesto { border-left: 4px solid #9C27B0; }
         .historial-item.factura { border-left: 4px solid #2196F3; }
+        .historial-item.anulada { border-left-color: #d32f2f; background: #ffebee; }
         .historial-info h4 { margin-bottom: 5px; }
         .historial-info p { color: #666; font-size: 0.9rem; }
+        .fecha-anulacion { color: #b71c1c; font-weight: 600; }
         .historial-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .historial-total { font-weight: bold; color: #2196F3; font-size: 1.1rem; min-width: 100px; text-align: right; }
         .historial-total.presupuesto { color: #9C27B0; }
+        .historial-total.anulada { color: #d32f2f; text-decoration: line-through; }
         .logo-preview { max-width: 150px; max-height: 100px; margin-top: 10px; display: block; }
         @media (max-width: 768px) { .concepto-fila { grid-template-columns: 1fr 1fr; } .historial-item { flex-direction: column; align-items: flex-start; } }
         @media (max-width: 500px) { .concepto-fila { grid-template-columns: 1fr; } }
@@ -86,7 +89,8 @@
         .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-left: 8px; }
         .badge-factura { background: #e3f2fd; color: #1565c0; }
         .badge-presupuesto { background: #f3e5f5; color: #7b1fa2; }
-        .filtro-historial { display: flex; gap: 10px; margin-bottom: 15px; }
+        .badge-anulada { background: #ffcdd2; color: #b71c1c; }
+        .filtro-historial { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .filtro-btn { padding: 8px 16px; border: 2px solid #e0e0e0; background: white; cursor: pointer; border-radius: 20px; font-size: 0.9rem; transition: all 0.3s; }
         .filtro-btn:hover { border-color: #bbb; }
         .filtro-btn.active { border-color: #2196F3; background: #e3f2fd; }
@@ -177,6 +181,7 @@
                 <button class="filtro-btn active" onclick="filtrarHistorial('todos')">Todos</button>
                 <button class="filtro-btn" onclick="filtrarHistorial('factura')">📄 Facturas</button>
                 <button class="filtro-btn" onclick="filtrarHistorial('presupuesto')">📋 Presupuestos</button>
+                <button class="filtro-btn" onclick="filtrarHistorial('anulada')">🚫 Anuladas</button>
             </div>
             <div id="historial-list" class="historial-list"><p style="color: #666;">No hay documentos en el historial.</p></div>
         </div>
@@ -532,6 +537,10 @@
         function editarFactura(index) {
             const factura = historial[index];
             if (!factura) return;
+            if ((factura.tipo || 'factura') === 'factura' && factura.estado === 'anulada') {
+                alert('Una factura anulada no se puede editar. Sus datos se conservan en el historial.');
+                return;
+            }
             
             editandoFactura = { ...factura, index };
             tipoDocumento = factura.tipo || 'factura';
@@ -623,6 +632,32 @@
                 guardarDatos();
                 renderHistorial();
             }
+        }
+
+        function anularFactura(index) {
+            const factura = historial[index];
+            const tipo = factura?.tipo || 'factura';
+            if (!factura || tipo !== 'factura') return;
+            if (factura.estado === 'anulada') {
+                alert('Esta factura ya está anulada.');
+                return;
+            }
+
+            const confirmar = confirm(
+                `¿Anular la factura ${factura.numero}?\n\n` +
+                'La factura no se borrará: conservará su número y sus datos, quedará marcada como ANULADA y ya no se podrá editar.'
+            );
+            if (!confirmar) return;
+
+            historial[index] = {
+                ...factura,
+                estado: 'anulada',
+                fechaAnulacion: new Date().toISOString()
+            };
+            if (editandoFactura?.index === index) cancelarEdicion();
+            guardarDatos();
+            renderHistorial();
+            alert(`La factura ${factura.numero} ha sido anulada.`);
         }
         
         function filtrarHistorial(filtro) {
@@ -730,18 +765,19 @@
             const total = base;
             const tipo = factura.tipo || 'factura';
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo, factura.estado);
             doc.save(`${nf}_${(cl.nombre || 'cliente').replace(/\s+/g, '_')}.pdf`);
         }
         
-        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo) {
+        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo, estado = 'activa') {
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
             const emisorX = 110;
             const maxWidthEmisor = 80;
             const esPresupuesto = tipo === 'presupuesto';
-            const titulo = esPresupuesto ? 'PRESUPUESTO' : 'FACTURA';
+            const estaAnulada = !esPresupuesto && estado === 'anulada';
+            const titulo = esPresupuesto ? 'PRESUPUESTO' : (estaAnulada ? 'FACTURA ANULADA' : 'FACTURA');
             const labelFechaVenc = esPresupuesto ? 'Valido hasta: ' : 'Vencimiento: ';
             
             if (config.logo) {
@@ -750,6 +786,7 @@
             
             doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
+            doc.setTextColor(estaAnulada ? 211 : 50, estaAnulada ? 47 : 50, estaAnulada ? 47 : 50);
             doc.text(titulo, rightMargin, y + 5, { align: 'right' });
             
             doc.setFontSize(12);
@@ -943,7 +980,8 @@
                 fechaVencimiento: fv,
                 total: total,
                 conceptos: conceptosGuardar,
-                tipo: tipoDocumento
+                tipo: tipoDocumento,
+                estado: editandoFactura?.estado || 'activa'
             };
             
             if (editandoFactura) {
@@ -985,7 +1023,9 @@
             const cont = document.getElementById('historial-list');
             let items = historial;
             
-            if (filtroActual !== 'todos') {
+            if (filtroActual === 'anulada') {
+                items = historial.filter(h => (h.tipo || 'factura') === 'factura' && h.estado === 'anulada');
+            } else if (filtroActual !== 'todos') {
                 items = historial.filter(h => (h.tipo || 'factura') === filtroActual);
             }
             
@@ -998,17 +1038,19 @@
                 const index = historial.indexOf(h);
                 const tipo = h.tipo || 'factura';
                 const esPresupuesto = tipo === 'presupuesto';
+                const estaAnulada = !esPresupuesto && h.estado === 'anulada';
                 return `
-                <div class="historial-item ${tipo}">
+                <div class="historial-item ${tipo} ${estaAnulada ? 'anulada' : ''}">
                     <div class="historial-info">
-                        <h4>${h.numero} <span class="badge badge-${tipo}">${esPresupuesto ? 'Presupuesto' : 'Factura'}</span></h4>
-                        <p>${h.cliente} | ${formatDateDisplay(h.fecha)}</p>
+                        <h4>${h.numero} <span class="badge badge-${tipo}">${esPresupuesto ? 'Presupuesto' : 'Factura'}</span>${estaAnulada ? '<span class="badge badge-anulada">ANULADA</span>' : ''}</h4>
+                        <p>${h.cliente} | ${formatDateDisplay(h.fecha)}${estaAnulada && h.fechaAnulacion ? `<br><span class="fecha-anulacion">Anulada el ${formatDateDisplay(h.fechaAnulacion)}</span>` : ''}</p>
                     </div>
-                    <div class="historial-total ${esPresupuesto ? 'presupuesto' : ''}">${formatMoney(h.total)}</div>
+                    <div class="historial-total ${esPresupuesto ? 'presupuesto' : ''} ${estaAnulada ? 'anulada' : ''}">${formatMoney(h.total)}</div>
                     <div class="historial-actions">
                         <button class="btn btn-primary btn-small" onclick="descargarFacturaHistorial(${index})">📄 Descargar</button>
                         ${esPresupuesto ? `<button class="btn btn-success btn-small" onclick="convertirAFactura(${index})">➡️ A Factura</button>` : ''}
-                        <button class="btn btn-warning btn-small" onclick="editarFactura(${index})">✏️ Editar</button>
+                        ${estaAnulada ? '' : `<button class="btn btn-warning btn-small" onclick="editarFactura(${index})">✏️ Editar</button>`}
+                        ${!esPresupuesto && !estaAnulada ? `<button class="btn btn-danger btn-small" onclick="anularFactura(${index})">🚫 Anular</button>` : ''}
                         <button class="btn btn-danger btn-small" onclick="eliminarFacturaHistorial(${index})">🗑️</button>
                     </div>
                 </div>

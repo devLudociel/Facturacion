@@ -156,7 +156,8 @@
             <button class="btn btn-primary" onclick="addConcepto()" style="margin-top: 15px;">+ Añadir concepto</button>
             <div class="totales">
                 <div class="total-row"><span>Base Imponible</span><span id="base-imponible">0,00€</span></div>
-                <div class="total-row"><span>TOTAL</span><span id="total-factura">0,00€</span></div>
+                <div class="total-row" id="fila-abonos" style="display: none;"><span>Abonos</span><span id="total-abonos">0,00€</span></div>
+                <div class="total-row"><span id="label-total">TOTAL</span><span id="total-factura">0,00€</span></div>
             </div>
             <h3 class="section-title" style="margin-top: 30px;">Fechas</h3>
             <div class="form-row">
@@ -390,14 +391,24 @@
             calcularTotales();
         }
 
+        // Las líneas con importe negativo son abonos (pagos a cuenta): se muestran después
+        // del subtotal de los trabajos y no reducen la base imponible, solo lo que queda por pagar.
+        function calcularImportes(lista) {
+            const importe = c => (parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0);
+            const trabajos = lista.filter(c => importe(c) >= 0);
+            const abonos = lista.filter(c => importe(c) < 0);
+            const subtotal = trabajos.reduce((s, c) => s + importe(c), 0);
+            const totalAbonos = abonos.reduce((s, c) => s + importe(c), 0);
+            return { trabajos, abonos, subtotal, totalAbonos, total: subtotal + totalAbonos };
+        }
+
         function calcularTotales() {
-            const base = conceptos.reduce((s, c) => {
-                const precio = parseFloat(c.precio) || 0;
-                const unidades = parseFloat(c.unidades) || 0;
-                return s + (precio * unidades);
-            }, 0);
-            document.getElementById('base-imponible').textContent = formatMoney(base);
-            document.getElementById('total-factura').textContent = formatMoney(base);
+            const { abonos, subtotal, totalAbonos, total } = calcularImportes(conceptos);
+            document.getElementById('base-imponible').textContent = formatMoney(subtotal);
+            document.getElementById('fila-abonos').style.display = abonos.length ? 'flex' : 'none';
+            document.getElementById('total-abonos').textContent = formatMoney(totalAbonos);
+            document.getElementById('label-total').textContent = abonos.length ? 'TOTAL A PAGAR' : 'TOTAL';
+            document.getElementById('total-factura').textContent = formatMoney(total);
         }
 
         function formatMoney(n) { return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '€'; }
@@ -672,13 +683,23 @@
             const fe = document.getElementById('fecha-emision').value;
             const fv = document.getElementById('fecha-vencimiento').value;
             const nf = getNumeroDocumento();
-            const base = conceptos.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
-            const total = base;
+            const { trabajos, abonos, subtotal, totalAbonos, total } = calcularImportes(conceptos);
             const logo = config.logo ? `<img src="${config.logo}" style="max-width:120px;max-height:80px;">` : '';
             const esPresupuesto = tipoDocumento === 'presupuesto';
             const titulo = esPresupuesto ? 'PRESUPUESTO' : 'FACTURA';
             const colorPrincipal = esPresupuesto ? '#9C27B0' : '#2196F3';
             const labelFechaVenc = esPresupuesto ? 'Válido hasta:' : 'Vencimiento:';
+            const filaConcepto = c => {
+                const precio = parseFloat(c.precio) || 0;
+                const unidades = parseFloat(c.unidades) || 0;
+                return `<tr>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;"><strong>${c.concepto}</strong>${c.descripcion ? `<br><span style="font-size:0.9rem;color:#666;">${c.descripcion}</span>` : ''}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio)}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${unidades}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio * unidades)}</td>
+                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio * unidades)}</td>
+                    </tr>`;
+            };
             
             return `<div style="background:white;padding:40px;font-family:'Segoe UI',Tahoma,sans-serif;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #FFD700;">
@@ -717,20 +738,15 @@
                         <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">SUBTOTAL</th>
                         <th style="background:#FFD700;padding:12px;text-align:right;font-weight:600;">TOTAL</th>
                     </tr></thead>
-                    <tbody>${conceptos.filter(c => c.concepto).map(c => {
-                        const precio = parseFloat(c.precio) || 0;
-                        const unidades = parseFloat(c.unidades) || 0;
-                        return `<tr>
-                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;"><strong>${c.concepto}</strong>${c.descripcion ? `<br><span style="font-size:0.9rem;color:#666;">${c.descripcion}</span>` : ''}</td>
-                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio)}</td>
-                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${unidades}</td>
-                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio * unidades)}</td>
-                        <td style="padding:12px;border-bottom:1px solid #e0e0e0;text-align:right;">${formatMoney(precio * unidades)}</td>
-                    </tr>`}).join('')}</tbody>
+                    <tbody>${trabajos.filter(c => c.concepto).map(filaConcepto).join('')}${abonos.length ? `<tr>
+                        <td colspan="4" style="padding:12px;background:#FFF3BF;font-weight:bold;">SUBTOTAL</td>
+                        <td style="padding:12px;background:#FFF3BF;font-weight:bold;text-align:right;">${formatMoney(subtotal)}</td>
+                    </tr>${abonos.filter(c => c.concepto).map(filaConcepto).join('')}` : ''}</tbody>
                 </table>
-                <div style="margin-left:auto;width:250px;">
-                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>Base Imponible</span><span>${formatMoney(base)}</span></div>
-                    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;background:#FFD700;padding:12px;margin-top:10px;"><span>TOTAL</span><span>${formatMoney(total)}</span></div>
+                <div style="margin-left:auto;width:${abonos.length ? 280 : 250}px;">
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>Base Imponible</span><span>${formatMoney(subtotal)}</span></div>
+                    ${abonos.length ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e0e0e0;"><span>Abonos</span><span>${formatMoney(totalAbonos)}</span></div>` : ''}
+                    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1rem;background:#FFD700;padding:12px;margin-top:10px;"><span>${abonos.length ? 'TOTAL A PAGAR' : 'TOTAL'}</span><span>${formatMoney(total)}</span></div>
                 </div>
                 <div style="margin-top:15px;text-align:right;font-style:italic;color:#666;">Exento de IGIC</div>
                 ${!esPresupuesto && config.emisor.iban ? `<div style="margin-top:20px;padding:15px;background:#f0f0f0;border-radius:8px;text-align:center;">Pagar por transferencia bancaria al siguiente número de cuenta <strong>${config.emisor.iban}</strong></div>` : ''}
@@ -761,15 +777,14 @@
             const fe = factura.fecha;
             const fv = factura.fechaVencimiento || fe;
             const conceptosFactura = factura.conceptos || [];
-            const base = conceptosFactura.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
-            const total = base;
             const tipo = factura.tipo || 'factura';
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo, factura.estado);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, tipo, factura.estado);
             doc.save(`${nf}_${(cl.nombre || 'cliente').replace(/\s+/g, '_')}.pdf`);
         }
         
-        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, base, total, tipo, estado = 'activa') {
+        function generarPDFInterno(doc, cl, nf, fe, fv, conceptosFactura, tipo, estado = 'activa') {
+            const { trabajos, abonos, subtotal, totalAbonos, total } = calcularImportes(conceptosFactura);
             let y = 20;
             const leftMargin = 20;
             const rightMargin = 190;
@@ -880,7 +895,7 @@
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(50);
             
-            conceptosFactura.filter(c => c.concepto).forEach(c => {
+            const dibujarConcepto = c => {
                 const precio = parseFloat(c.precio) || 0;
                 const unidades = parseFloat(c.unidades) || 0;
                 
@@ -907,20 +922,38 @@
                 doc.setDrawColor(200);
                 doc.line(leftMargin, y, rightMargin, y);
                 y += 4;
-            });
+            };
+            
+            trabajos.filter(c => c.concepto).forEach(dibujarConcepto);
+            
+            if (abonos.length) {
+                doc.setFillColor(255, 243, 191);
+                doc.rect(leftMargin, y - 4, 170, 8, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.text('SUBTOTAL', leftMargin + 2, y + 1.2);
+                doc.text(formatMoney(subtotal), 188, y + 1.2, { align: 'right' });
+                y += 8;
+                abonos.filter(c => c.concepto).forEach(dibujarConcepto);
+            }
             
             y += 5;
             const totalesX = 130;
             doc.setFont('helvetica', 'normal');
             doc.text('Base Imponible', totalesX, y);
-            doc.text(formatMoney(base), 188, y, { align: 'right' });
+            doc.text(formatMoney(subtotal), 188, y, { align: 'right' });
+            
+            if (abonos.length) {
+                y += 6;
+                doc.text('Abonos', totalesX, y);
+                doc.text(formatMoney(totalAbonos), 188, y, { align: 'right' });
+            }
             
             y += 8;
             doc.setFillColor(255, 215, 0);
             doc.rect(totalesX - 2, y - 5, 62, 10, 'F');
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
-            doc.text('TOTAL', totalesX, y);
+            doc.text(abonos.length ? 'TOTAL A PAGAR' : 'TOTAL', totalesX, y);
             doc.text(formatMoney(total), 188, y, { align: 'right' });
             
             y += 12;
@@ -960,10 +993,9 @@
             const nf = getNumeroDocumento();
             const fe = document.getElementById('fecha-emision').value;
             const fv = document.getElementById('fecha-vencimiento').value;
-            const base = conceptos.reduce((s, c) => s + ((parseFloat(c.precio) || 0) * (parseFloat(c.unidades) || 0)), 0);
-            const total = base;
+            const { total } = calcularImportes(conceptos);
             
-            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, base, total, tipoDocumento);
+            generarPDFInterno(doc, cl, nf, fe, fv, conceptos, tipoDocumento);
             doc.save(`${nf}_${cl.nombre.replace(/\s+/g, '_')}.pdf`);
             
             const conceptosGuardar = conceptos.map(c => ({
